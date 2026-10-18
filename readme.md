@@ -1,110 +1,286 @@
-# Dados de Terremotos — USGS ComCat
+# Terremotos no Chile — USGS
 
-Este documento descreve os dados utilizados no projeto: de onde vêm, como são obtidos, quais campos possuem e quais cuidados exigem.
+Aplicação web em Python para análise de terremotos registrados na região do Chile, com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS).
 
-## Fonte
+Ao iniciar, a aplicação verifica se os dados já foram baixados. Se ainda não foram, ela consulta a API do USGS, salva os dados localmente e os exibe no navegador.
 
-Os dados vêm do **ANSS Comprehensive Earthquake Catalog (ComCat)**, mantido pelo **Serviço Geológico dos Estados Unidos (USGS)**. O catálogo reúne eventos sísmicos registrados por redes sismográficas do mundo inteiro e é atualizado continuamente.
+---
 
-- **Serviço:** FDSN Event Web Service
-- **Documentação:** https://earthquake.usgs.gov/fdsnws/event/1/
-- **Acesso:** público e gratuito, sem cadastro ou chave de API
-- **Licença:** dados do governo dos EUA, em domínio público
+## Sumário
 
-## Escopo
+1. [Como rodar o projeto](#como-rodar-o-projeto)
+2. [Estrutura do projeto](#estrutura-do-projeto)
+3. [Fluxo de dados](#fluxo-de-dados)
+4. [Dados utilizados](#dados-utilizados)
+5. [Limitações dos dados](#limitações-dos-dados)
+
+---
+
+## Como rodar o projeto
+
+### Pré-requisitos
+
+- Python **3.10** ou mais recente
+- Conexão com a internet na primeira execução, para baixar os dados
+
+### 1. Clonar o repositório
+
+```bash
+git clone <url-do-repositorio>
+cd terremotos
+```
+
+### 2. Criar o ambiente virtual
+
+O ambiente virtual isola as bibliotecas do projeto das instaladas no computador.
+
+```bash
+python -m venv .venv
+```
+
+### 3. Ativar o ambiente virtual
+
+**Windows (PowerShell):**
+
+```powershell
+.venv\Scripts\activate
+```
+
+Se aparecer um erro dizendo que a execução de scripts está desabilitada, libere os scripts locais para o seu usuário e tente de novo:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.venv\Scripts\activate
+```
+
+**Windows (Prompt de Comando):**
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+**Linux / macOS:**
+
+```bash
+source .venv/bin/activate
+```
+
+Com o ambiente ativo, o terminal passa a mostrar `(.venv)` no início da linha.
+
+### 4. Instalar as dependências
+
+```bash
+pip install -r requirements.txt
+```
+
+| Biblioteca | Uso |
+|---|---|
+| `pandas` | manipulação dos dados em tabelas (DataFrames) |
+| `requests` | requisições HTTP à API do USGS |
+| `streamlit` | interface web da aplicação |
+
+### 5. Iniciar a aplicação
+
+```bash
+streamlit run app/app.py
+```
+
+O navegador abre automaticamente em `http://localhost:8501`.
+
+Na **primeira execução**, a aplicação baixa os dados do USGS, o que pode levar alguns minutos. Nas seguintes, ela lê o arquivo já salvo e abre na hora. Para baixar os dados de novo, use o botão **Atualizar dados da API** na barra lateral.
+
+### Coletar os dados sem abrir a aplicação
+
+```bash
+python src/coleta.py
+```
+
+### Alterar os filtros da coleta
+
+Os filtros ficam no topo de `src/coleta.py`:
+
+```python
+REGIAO = "chile"         # "global" ou uma das regiões cadastradas
+MAGNITUDE_MINIMA = None  # None = todas as magnitudes; ou um número, ex.: 5.0
+ANOS = 3                 # quantos anos para trás, a partir de hoje
+FORMATO = "csv"          # "csv", "geojson" ou "ambos"
+```
+
+Cada combinação de filtros gera um arquivo com nome próprio, então uma coleta nova não apaga a anterior.
+
+---
+
+## Estrutura do projeto
+
+```
+terremotos/
+├── app/
+│   └── app.py           # interface web (Streamlit): ponto de entrada
+├── src/
+│   ├── __init__.py      # torna src um pacote importável
+│   └── coleta.py        # consulta à API do USGS e gravação dos dados
+├── data/
+│   └── raw/             # dados brutos baixados da API
+├── notebooks/           # análises exploratórias
+├── requirements.txt
+└── README.md
+```
+
+A lógica de dados fica em `src/` e é importada tanto pela aplicação quanto pelos notebooks, para que os dois trabalhem sempre com a mesma base.
+
+---
+
+## Fluxo de dados
+
+```
+streamlit run app/app.py
+        │
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│ 1. Streamlit sobe um servidor web (localhost:8501)       │
+└──────────────────────────────────────────────────────────┘
+        │  o navegador abre a página
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│ 2. Streamlit executa app/app.py de cima a baixo          │
+└──────────────────────────────────────────────────────────┘
+        │  app.py chama obter_dados()
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│ 3. Cache do Streamlit (@st.cache_data)                   │
+│    ├─ resultado guardado? → devolve o DataFrame          │
+│    └─ não → coleta.carregar_ou_coletar()                 │
+└──────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│ 4. src/coleta.py                                         │
+│    ├─ arquivo em data/raw/ existe? → lê o CSV            │
+│    └─ não → executar()                                   │
+│          ├─ divide o período em janelas de 1 ano         │
+│          ├─ count: confere o total de cada janela        │
+│          ├─ query: baixa a janela em GeoJSON             │
+│          ├─ achata o GeoJSON em tabela                   │
+│          └─ salva o CSV em data/raw/                     │
+└──────────────────────────────────────────────────────────┘
+        │  DataFrame do pandas
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│ 5. app.py recebe o DataFrame e o mantém na memória       │
+└──────────────────────────────────────────────────────────┘
+        │  st.metric(), st.dataframe() ...
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│ 6. Streamlit converte cada chamada em componente visual  │
+│    e envia ao navegador                                  │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Etapa por etapa
+
+**1. O servidor.** O comando `streamlit run` inicia um servidor web local. Nesse momento o `app.py` ainda não rodou: ele é o roteiro que o servidor executa quando alguém abre a página.
+
+**2. A execução do app.** Quando o navegador se conecta, o Streamlit executa o `app.py` do início ao fim. O `import streamlit as st` não inicia nada; apenas dá acesso às funções `st.*`.
+
+**3. O cache.** A função `obter_dados()` tem o decorador `@st.cache_data`. Na primeira chamada, ela executa e guarda o resultado; nas seguintes, devolve o resultado guardado sem refazer o trabalho.
+
+**4. A coleta.** O `app.py` não sabe de onde vêm os dados: ele só pede a `coleta.carregar_ou_coletar()`. É o `coleta.py` que decide entre ler o arquivo salvo e consultar a API. Quando consulta, ele:
+
+- divide o período em janelas de um ano;
+- confere o total de cada janela pelo método `count` antes de baixar;
+- se uma janela passar do limite de 20.000 eventos da API, divide-a ao meio e repete o processo;
+- baixa os eventos em GeoJSON pelo método `query`;
+- converte o GeoJSON em tabela e remove duplicatas pelo `id`;
+- salva o resultado em `data/raw/`.
+
+**5. Os dados na memória.** O resultado volta como um DataFrame do pandas, guardado numa variável do `app.py`. O Streamlit não recebe nem armazena a tabela inteira.
+
+**6. A exibição.** Cada função `st.*` é uma instrução de exibição. O Streamlit transforma cada uma num componente da página e envia ao navegador. Exibir `df.head(100)` envia só essas 100 linhas, mesmo que a tabela tenha milhares.
+
+### O que acontece a cada interação
+
+A cada clique ou mudança de filtro, o Streamlit **executa o `app.py` inteiro novamente**. O cache é o que impede que cada interação dispare uma nova consulta à API: a coleta roda uma vez, e as execuções seguintes reaproveitam o resultado.
+
+O botão **Atualizar dados da API** é a exceção: ele limpa o cache e chama a coleta com `forcar=True`, que ignora o arquivo salvo e baixa tudo de novo.
+
+---
+
+## Dados utilizados
+
+### Fonte
+
+Os dados vêm do **ANSS Comprehensive Earthquake Catalog (ComCat)**, mantido pelo **USGS**. O catálogo reúne eventos sísmicos registrados por redes sismográficas do mundo inteiro e é atualizado continuamente.
+
+| | |
+|---|---|
+| Serviço | FDSN Event Web Service |
+| Documentação | https://earthquake.usgs.gov/fdsnws/event/1/ |
+| Acesso | público e gratuito, sem cadastro ou chave de API |
+| Licença | dados do governo dos EUA, em domínio público |
+
+### Escopo da coleta
 
 | Critério | Valor |
 |---|---|
-| Período | últimos 10 anos |
-| Magnitude mínima | 5.0 |
+| Região | Chile |
+| Coordenadas | latitude de -56 a -17, longitude de -76 a -66 |
+| Magnitude | todas, sem limite mínimo |
+| Período | últimos 3 anos, contados a partir da data da coleta |
 | Tipo de evento | apenas terremotos (`eventtype=earthquake`) |
-| Abrangência | global, com recortes por região |
+| Arquivo gerado | `data/raw/terremotos_chile_mtodas_3anos.csv` |
 
-A magnitude mínima de 5.0 mantém apenas eventos relevantes e deixa de fora os microtremores, que são numerosos e registrados com densidade muito desigual entre as regiões.
+O recorte é um retângulo geográfico. Por isso ele inclui também parte do Oceano Pacífico e pequenas áreas de países vizinhos, como Argentina, Bolívia e Peru.
 
-## Como os dados são obtidos
+### Requisição utilizada
 
-As consultas são requisições `GET` ao endpoint de consulta:
-
-```
-https://earthquake.usgs.gov/fdsnws/event/1/query
-```
-
-Exemplo, com terremotos de magnitude 5 ou mais em um ano:
+Os dados são baixados em GeoJSON, porque é o formato que traz os campos de impacto (`tsunami`, `alert`, `sig`), ausentes no CSV da API. Exemplo de uma das requisições feitas pela coleta, para uma janela de um ano:
 
 ```
-https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-18&endtime=2026-10-18&eventtype=earthquake&minmagnitude=5
+https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-18T00:00:00&endtime=2026-10-18T00:00:00&eventtype=earthquake&minlatitude=-56&maxlatitude=-17&minlongitude=-76&maxlongitude=-66
 ```
 
-Antes de baixar, o total de eventos pode ser conferido trocando `query` por `count`:
+Como não há filtro de magnitude, o parâmetro `minmagnitude` não é enviado. Assim a API devolve todos os eventos, inclusive os de magnitude negativa, que existem nas escalas locais.
 
-```
-https://earthquake.usgs.gov/fdsnws/event/1/count?starttime=2025-10-18&endtime=2026-10-18&eventtype=earthquake&minmagnitude=5
-```
+### Colunas do arquivo
 
-### Parâmetros utilizados
+O CSV salvo em `data/raw/` é gerado pela coleta a partir do GeoJSON, com uma linha por terremoto.
 
-| Parâmetro | Função |
-|---|---|
-| `format` | formato da resposta (`geojson` ou `csv`) |
-| `starttime` / `endtime` | período, no formato ISO 8601 (UTC) |
-| `minmagnitude` | magnitude mínima |
-| `eventtype` | tipo de evento |
-| `minlatitude`, `maxlatitude`, `minlongitude`, `maxlongitude` | recorte retangular por região |
+**Identificação e localização**
 
-### Limite de 20.000 eventos
-
-O serviço retorna no máximo 20.000 eventos por consulta. Acima disso, a resposta é `400 Bad Request`. Por isso, períodos longos são baixados em janelas de tempo (por exemplo, um ano por vez), e os resultados são unidos depois, removendo duplicatas pelo identificador `id`.
-
-### Recortes regionais
-
-Além da base global, são gerados arquivos por região, todos com as mesmas colunas:
-
-| Região | Latitude | Longitude |
+| Coluna | Tipo | Descrição |
 |---|---|---|
-| Chile | -56 a -17 | -76 a -66 |
-| Japão | 24 a 46 | 122 a 146 |
-| Indonésia | -11 a 6 | 95 a 141 |
-| Califórnia | 32 a 42 | -125 a -114 |
+| `id` | texto | identificador único do evento no catálogo |
+| `longitude` | decimal | longitude do epicentro, em graus |
+| `latitude` | decimal | latitude do epicentro, em graus |
+| `depth` | decimal | profundidade do hipocentro, em km |
+| `place` | texto | descrição do local (ex.: "45 km W of Valparaíso, Chile") |
 
-## Formatos
+**Magnitude e tempo**
 
-Os dados são obtidos em dois formatos, com uma diferença importante entre eles:
-
-- **GeoJSON:** formato principal, porque é o único que traz os campos de impacto, como `tsunami`, `alert` e `sig`.
-- **CSV:** mais simples de abrir, mas **não contém** esses campos de impacto.
-
-## Campos
-
-### GeoJSON
-
-Cada evento é um item da lista `features`, com a localização em `geometry` e os demais atributos em `properties`.
-
-**Localização (`geometry.coordinates`)**
-
-| Posição | Campo | Descrição |
-|---|---|---|
-| 0 | longitude | graus decimais, de -180 a 180 |
-| 1 | latitude | graus decimais, de -90 a 90 |
-| 2 | profundidade | km abaixo da superfície |
-
-A ordem é **longitude, latitude, profundidade**, e não latitude primeiro.
-
-**Atributos (`properties`)**
-
-| Campo | Tipo | Descrição |
+| Coluna | Tipo | Descrição |
 |---|---|---|
 | `mag` | decimal | magnitude do evento |
-| `magType` | texto | escala usada para a magnitude (`mww`, `mb`, `ml` etc.) |
+| `magType` | texto | escala da magnitude (`ml`, `mb`, `mww` etc.) |
 | `time` | inteiro | horário de origem, em milissegundos desde 01/01/1970 (UTC) |
 | `updated` | inteiro | última atualização do registro, em milissegundos |
-| `place` | texto | descrição do local (ex.: "100 km SW of Lima, Peru") |
+
+O `time` é mantido como veio da fonte. A conversão para data é feita na etapa de tratamento.
+
+**Impacto**
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
 | `tsunami` | 0 ou 1 | 1 quando o USGS emitiu uma mensagem de tsunami para o evento |
-| `alert` | texto | nível de alerta PAGER de impacto: `green`, `yellow`, `orange`, `red` |
-| `sig` | inteiro | índice de significância, de 0 a 1000+, calculado pelo USGS |
+| `alert` | texto | nível de alerta PAGER: `green`, `yellow`, `orange`, `red` |
+| `sig` | inteiro | índice de significância calculado pelo USGS (0 a 1000+) |
 | `felt` | inteiro | número de relatos de pessoas que sentiram o tremor |
 | `cdi` | decimal | intensidade máxima relatada pela população (0 a 12) |
 | `mmi` | decimal | intensidade máxima estimada na escala Mercalli Modificada (0 a 12) |
+
+**Qualidade do registro**
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
 | `nst` | inteiro | número de estações usadas para localizar o evento |
 | `gap` | decimal | maior lacuna azimutal entre estações, em graus |
 | `dmin` | decimal | distância até a estação mais próxima, em graus |
@@ -113,59 +289,39 @@ A ordem é **longitude, latitude, profundidade**, e não latitude primeiro.
 | `net` | texto | rede sismográfica responsável pelo registro |
 | `type` | texto | tipo do evento |
 
-### CSV
+### Campos derivados
 
-| Campo | Descrição |
-|---|---|
-| `time` | horário de origem, ISO 8601 (UTC) |
-| `latitude`, `longitude` | localização do epicentro |
-| `depth` | profundidade, em km |
-| `mag`, `magType` | magnitude e escala |
-| `nst`, `gap`, `dmin`, `rms` | qualidade da localização |
-| `net`, `id` | rede e identificador do evento |
-| `updated` | última atualização |
-| `place` | descrição do local |
-| `type` | tipo do evento |
-| `horizontalError`, `depthError`, `magError` | incertezas de localização e magnitude |
-| `magNst` | número de estações usadas na magnitude |
-| `status` | `automatic` ou `reviewed` |
-| `locationSource`, `magSource` | rede de origem da localização e da magnitude |
-
-O campo `place` contém vírgulas e vem entre aspas no CSV. Ele deve ser lido com um leitor de CSV que respeite aspas.
-
-## Campos derivados
-
-A partir dos campos originais, são criados:
+Na etapa de tratamento, são criados a partir das colunas originais:
 
 | Campo | Origem | Descrição |
 |---|---|---|
 | `data_hora` | `time` | data e hora convertidas para datetime UTC |
 | `ano`, `mes` | `time` | componentes de data para análises temporais |
-| `regiao` | `place` | texto após a última vírgula (ex.: "Peru") |
-| `faixa_profundidade` | profundidade | raso (< 70 km), intermediário (70–300 km) ou profundo (> 300 km) |
+| `faixa_profundidade` | `depth` | raso (< 70 km), intermediário (70–300 km) ou profundo (> 300 km) |
 
 As faixas de profundidade seguem a classificação usual em sismologia.
 
-## Tratamento aplicado
+### Por que o Chile
 
-- Remoção de duplicatas pelo `id`.
-- Remoção de eventos que não sejam terremotos (`type`).
-- Conversão do tempo de milissegundos para datetime.
-- Tratamento de valores ausentes em `nst`, `gap`, `dmin`, `felt`, `cdi`, `mmi` e `alert`, que são comuns.
-- Revisão de profundidades negativas, que ocorrem quando o evento é registrado acima do nível do mar de referência.
+O Chile fica sobre a zona de subducção onde a Placa de Nazca mergulha sob a Placa Sul-Americana, uma das regiões sismicamente mais ativas do mundo. Isso garante um volume grande de eventos em poucos anos e permite observar terremotos rasos, junto à costa, e profundos, sob a cordilheira, numa mesma base.
+
+---
 
 ## Limitações dos dados
 
-- **`tsunami` indica uma mensagem, não um tsunami.** O valor 1 significa que o USGS emitiu um aviso, o que segue um protocolo baseado principalmente em magnitude e localização. Não confirma que uma onda ocorreu.
-- **Escalas de magnitude diferentes.** O campo `magType` mostra que nem todas as magnitudes foram medidas da mesma forma; para eventos grandes, predomina a magnitude de momento (`mww`).
-- **Cobertura desigual.** Regiões com redes sismográficas densas, como os EUA e o Japão, têm registros mais completos e precisos.
+- **Escalas de magnitude diferentes.** Sem limite mínimo, a base mistura tremores pequenos, medidos em escalas locais como a `ml`, com eventos grandes, medidos pela magnitude de momento (`mww`). As escalas não são diretamente equivalentes, e o campo `magType` deve ser considerado nas análises.
+- **Completude desigual.** Tremores muito pequenos só são detectados perto das estações sismográficas. A ausência de eventos pequenos numa área pode refletir falta de cobertura, não falta de atividade.
+- **Campos de impacto quase vazios.** `felt`, `cdi`, `mmi` e `alert` só existem quando houve relatos da população ou avaliação de impacto, o que é raro em tremores pequenos.
+- **`tsunami` indica uma mensagem, não um tsunami.** O valor 1 significa que o USGS emitiu um aviso, segundo um protocolo baseado principalmente em magnitude e localização. Não confirma que uma onda ocorreu.
 - **Dados revisáveis.** Eventos recentes podem estar com `status=automatic` e ter localização ou magnitude ajustadas depois.
-- **Campos de impacto incompletos.** `felt`, `cdi`, `mmi` e `alert` só existem quando houve relatos da população ou avaliação de impacto, o que é raro em eventos no meio do oceano.
-- **Variáveis físicas ausentes.** O catálogo não traz o mecanismo de falha nem o deslocamento do fundo do mar, fatores determinantes para tsunamis.
+- **Recorte retangular.** O retângulo da coleta não segue as fronteiras do país e inclui áreas oceânicas e de países vizinhos.
+- **Variáveis físicas ausentes.** O catálogo não traz o mecanismo de falha nem o deslocamento do fundo do mar.
+
+---
 
 ## Referências
 
 - USGS FDSN Event Web Service: https://earthquake.usgs.gov/fdsnws/event/1/
 - Formato GeoJSON do USGS: https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php
-- Formato CSV do USGS: https://earthquake.usgs.gov/earthquakes/feed/v1.0/csv.php
-- Glossário dos campos do ComCat: https://earthquake.usgs.gov/data/comcat/
+- Documentação do ComCat: https://earthquake.usgs.gov/data/comcat/
+- Documentação do Streamlit: https://docs.streamlit.io/

@@ -1,17 +1,15 @@
 """
 Coleta de terremotos do catálogo ComCat (USGS).
 
-Baixa os eventos em GeoJSON, contorna o limite de 20.000 eventos por consulta
-dividindo o período em janelas menores e salva os dados em data/raw/.
+Os filtros ficam definidos no bloco CONFIGURAÇÃO logo abaixo.
+Para coletar, basta rodar, a partir da raiz do projeto:
 
-Uso (a partir da raiz do projeto):
-    python src/coleta.py                       # global, 10 anos, M >= 5
-    python src/coleta.py --regiao chile        # só uma região
-    python src/coleta.py --regiao todas        # global + cada região
-    python src/coleta.py --anos 5 --minmag 5.5
+    python src/coleta.py
+
+O script baixa os eventos em GeoJSON, contorna o limite de 20.000 eventos por
+consulta dividindo o período em janelas menores e salva o resultado em data/raw/.
 """
 
-import argparse
 import json
 import time
 from datetime import datetime, timedelta, timezone
@@ -20,12 +18,13 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-URL_BASE = "https://earthquake.usgs.gov/fdsnws/event/1"
-LIMITE_API = 20_000          # máximo de eventos que a API devolve por consulta
-TENTATIVAS = 3               # novas tentativas em caso de falha de rede
-
-# Pasta de saída: <raiz do projeto>/data/raw, independente de onde o script é chamado
-PASTA_RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
+# =============================================================================
+# CONFIGURAÇÃO DA COLETA — altere aqui os filtros
+# =============================================================================
+REGIAO = "chile"        # "global" ou uma das chaves de REGIOES abaixo
+MAGNITUDE_MINIMA = None  # None = todas as magnitudes; ou um número, ex.: 5.0
+ANOS = 3                # quantos anos para trás, a partir de hoje
+FORMATO = "csv"         # "csv", "geojson" ou "ambos"
 
 # Recortes regionais: (lat_min, lat_max, lon_min, lon_max)
 REGIOES = {
@@ -34,6 +33,14 @@ REGIOES = {
     "indonesia":  (-11, 6, 95, 141),
     "california": (32, 42, -125, -114),
 }
+# =============================================================================
+
+URL_BASE = "https://earthquake.usgs.gov/fdsnws/event/1"
+LIMITE_API = 20_000          # máximo de eventos que a API devolve por consulta
+TENTATIVAS = 3               # novas tentativas em caso de falha de rede
+
+# Pasta de saída: <raiz do projeto>/data/raw, independente de onde o script é chamado
+PASTA_RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
 
 # Campos de "properties" que serão mantidos
 CAMPOS = [
@@ -63,27 +70,29 @@ def _get(metodo: str, params: dict) -> requests.Response:
             time.sleep(espera)
 
 
-def _params(inicio: datetime, fim: datetime, minmag: float, regiao: str | None) -> dict:
+def _params(inicio: datetime, fim: datetime, minmag: float | None, regiao: str) -> dict:
     """Monta os parâmetros comuns às chamadas de count e query."""
     params = {
         "starttime": inicio.strftime("%Y-%m-%dT%H:%M:%S"),
         "endtime": fim.strftime("%Y-%m-%dT%H:%M:%S"),
-        "minmagnitude": minmag,
         "eventtype": "earthquake",
     }
-    if regiao:
+    if minmag is not None:
+        # sem minmagnitude a API devolve todas as magnitudes, inclusive as negativas
+        params["minmagnitude"] = minmag
+    if regiao != "global":
         lat_min, lat_max, lon_min, lon_max = REGIOES[regiao]
         params.update(minlatitude=lat_min, maxlatitude=lat_max,
                       minlongitude=lon_min, maxlongitude=lon_max)
     return params
 
 
-def contar(inicio, fim, minmag, regiao=None) -> int:
+def contar(inicio, fim, minmag, regiao) -> int:
     """Quantos eventos a consulta retornaria (sem baixar os dados)."""
     return int(_get("count", _params(inicio, fim, minmag, regiao)).text)
 
 
-def baixar_janela(inicio, fim, minmag, regiao=None) -> list[dict]:
+def baixar_janela(inicio, fim, minmag, regiao) -> list[dict]:
     """
     Baixa as features GeoJSON de uma janela de tempo.
     Se a janela passar do limite da API, divide ao meio e baixa cada metade.
@@ -129,7 +138,7 @@ def features_para_dataframe(features: list[dict]) -> pd.DataFrame:
 # ----------------------------------------------------------------------------
 # Orquestração
 # ----------------------------------------------------------------------------
-def coletar(anos: int = 10, minmag: float = 5.0, regiao: str | None = None):
+def coletar(anos: int, minmag: float | None, regiao: str):
     """Baixa o período inteiro, ano a ano, e devolve (features, DataFrame)."""
     fim = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
     inicio = fim - timedelta(days=365 * anos)
@@ -144,43 +153,74 @@ def coletar(anos: int = 10, minmag: float = 5.0, regiao: str | None = None):
     return features, features_para_dataframe(features)
 
 
-def salvar(nome: str, features: list[dict], df: pd.DataFrame) -> None:
-    """Salva o GeoJSON bruto e a versão tabular em CSV."""
+def salvar(nome: str, features: list[dict], df: pd.DataFrame, formato: str) -> None:
+    """Salva a versão tabular em CSV e/ou o GeoJSON bruto, conforme o formato pedido."""
     PASTA_RAW.mkdir(parents=True, exist_ok=True)
+    salvos = []
 
-    # remove duplicatas também do GeoJSON, mantendo a mesma base do CSV
-    unicos = list({f["id"]: f for f in features}.values())
-    caminho_geo = PASTA_RAW / f"terremotos_{nome}.geojson"
-    with open(caminho_geo, "w", encoding="utf-8") as arq:
-        json.dump({"type": "FeatureCollection", "features": unicos}, arq)
+    if formato in ("csv", "ambos"):
+        caminho_csv = PASTA_RAW / f"terremotos_{nome}.csv"
+        df.to_csv(caminho_csv, index=False)
+        salvos.append(caminho_csv.name)
 
-    caminho_csv = PASTA_RAW / f"terremotos_{nome}.csv"
-    df.to_csv(caminho_csv, index=False)
+    if formato in ("geojson", "ambos"):
+        # remove duplicatas também do GeoJSON, mantendo a mesma base do CSV
+        unicos = list({f["id"]: f for f in features}.values())
+        caminho_geo = PASTA_RAW / f"terremotos_{nome}.geojson"
+        with open(caminho_geo, "w", encoding="utf-8") as arq:
+            json.dump({"type": "FeatureCollection", "features": unicos}, arq)
+        salvos.append(caminho_geo.name)
 
-    positivos = int(df["tsunami"].sum()) if not df.empty else 0
-    print(f"  salvo: {caminho_csv.name} e {caminho_geo.name} "
-          f"({len(df)} eventos, {positivos} com alerta de tsunami)")
+    positivos = int(df["tsunami"].fillna(0).sum()) if not df.empty else 0
+    print(f"  salvo: {' e '.join(salvos)} ({len(df)} eventos, {positivos} com alerta de tsunami)")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Coleta de terremotos do USGS")
-    parser.add_argument("--anos", type=int, default=10, help="anos para trás a partir de hoje")
-    parser.add_argument("--minmag", type=float, default=5.0, help="magnitude mínima")
-    parser.add_argument("--regiao", default="global",
-                        choices=["global", "todas", *REGIOES],
-                        help="global, todas (global + regiões) ou uma região")
-    args = parser.parse_args()
+def validar_configuracao() -> None:
+    """Confere a configuração antes de chamar a API, com mensagens claras."""
+    if REGIAO != "global" and REGIAO not in REGIOES:
+        raise ValueError(f"REGIAO inválida: {REGIAO!r}. Use 'global' ou {list(REGIOES)}.")
+    if FORMATO not in ("csv", "geojson", "ambos"):
+        raise ValueError(f"FORMATO inválido: {FORMATO!r}. Use 'csv', 'geojson' ou 'ambos'.")
+    if not isinstance(ANOS, int) or ANOS < 1:
+        raise ValueError(f"ANOS deve ser um inteiro maior que zero, recebido: {ANOS!r}.")
 
-    if args.regiao == "todas":
-        alvos = ["global", *REGIOES]
-    else:
-        alvos = [args.regiao]
 
-    for alvo in alvos:
-        print(f"\n[{alvo}] M >= {args.minmag}, últimos {args.anos} anos")
-        features, df = coletar(args.anos, args.minmag, None if alvo == "global" else alvo)
-        salvar(alvo, features, df)
+def nome_base() -> str:
+    """Nome dos arquivos de saída; registra os filtros para uma coleta não sobrescrever outra."""
+    rotulo_mag = "todas" if MAGNITUDE_MINIMA is None else f"{MAGNITUDE_MINIMA:g}"
+    return f"{REGIAO}_m{rotulo_mag}_{ANOS}anos"
+
+
+def arquivo_saida() -> Path:
+    """Caminho do arquivo principal gerado pela configuração atual."""
+    extensao = "geojson" if FORMATO == "geojson" else "csv"
+    return PASTA_RAW / f"terremotos_{nome_base()}.{extensao}"
+
+
+def executar() -> pd.DataFrame:
+    """Roda a coleta com a configuração do topo do arquivo, salva e devolve os dados."""
+    validar_configuracao()
+    filtro_mag = "todas as magnitudes" if MAGNITUDE_MINIMA is None else f"M >= {MAGNITUDE_MINIMA:g}"
+    print(f"[{REGIAO}] {filtro_mag}, últimos {ANOS} anos, formato {FORMATO}")
+
+    features, df = coletar(ANOS, MAGNITUDE_MINIMA, REGIAO)
+    salvar(nome_base(), features, df, FORMATO)
+    return df
+
+
+def carregar_ou_coletar(forcar: bool = False) -> pd.DataFrame:
+    """
+    Usa o arquivo já baixado, se existir; senão, roda a coleta.
+    Com forcar=True, sempre baixa de novo (para atualizar os dados).
+    """
+    caminho = arquivo_saida()
+    if caminho.exists() and not forcar:
+        if caminho.suffix == ".csv":
+            return pd.read_csv(caminho)
+        with open(caminho, encoding="utf-8") as arq:
+            return features_para_dataframe(json.load(arq)["features"])
+    return executar()
 
 
 if __name__ == "__main__":
-    main()
+    executar()
