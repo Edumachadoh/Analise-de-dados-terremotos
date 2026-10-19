@@ -40,29 +40,16 @@ python -m venv .venv
 
 ### 3. Ativar o ambiente virtual
 
-**Windows (PowerShell):**
+**PowerShell:**
 
 ```powershell
 .venv\Scripts\activate
 ```
 
-Se aparecer um erro dizendo que a execução de scripts está desabilitada, libere os scripts locais para o seu usuário e tente de novo:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.venv\Scripts\activate
-```
-
-**Windows (Prompt de Comando):**
+**Prompt de Comando:**
 
 ```cmd
 .venv\Scripts\activate.bat
-```
-
-**Linux / macOS:**
-
-```bash
-source .venv/bin/activate
 ```
 
 Com o ambiente ativo, o terminal passa a mostrar `(.venv)` no início da linha.
