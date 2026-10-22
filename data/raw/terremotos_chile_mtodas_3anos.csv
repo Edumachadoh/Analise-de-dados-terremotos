@@ -1,20 +1,4 @@
 id,mag,magType,time,updated,place,tsunami,alert,sig,felt,cdi,mmi,nst,gap,dmin,rms,status,net,type,longitude,latitude,depth
-us6000lgse,4.5,mb,1697767400202,1703625880040,"78 km E of La Tirana, Chile",0,,312,2.0,2.0,,38,51,0.79,0.91,reviewed,us,earthquake,-68.9087,-20.4149,111.674
-us6000lgtd,4.5,mb,1697777003557,1703625881040,"88 km NW of Vallenar, Chile",0,,312,,,,28,146,0.378,0.87,reviewed,us,earthquake,-71.4879,-28.1083,42.718
-us6000lgtn,4.3,mb,1697780653032,1703625881040,"21 km SE of Calingasta, Argentina",0,,284,,,,37,40,0.5,0.86,reviewed,us,earthquake,-69.2643,-31.4791,119.86
-us6000lgyz,4.3,mwr,1697817908767,1703625887040,"88 km W of San Antonio de los Cobres, Argentina",0,,284,,,,31,57,1.626,1.11,reviewed,us,earthquake,-67.1852,-24.3044,166.629
-us6000lgz0,4.5,mb,1697818681245,1703625888040,"56 km WSW of Coquimbo, Chile",0,,312,,,,28,91,0.597,0.44,reviewed,us,earthquake,-71.8418,-30.2082,47.486
-us6000lgz3,4.6,mwr,1697821012451,1703625888040,"124 km NE of San Pedro de Atacama, Chile",0,,326,,,,43,34,1.134,1.05,reviewed,us,earthquake,-67.3518,-22.11,178.024
-us6000lgzs,4.5,mb,1697826868817,1703625888040,"23 km E of Curahuara de Carangas, Bolivia",0,,312,,,,19,78,1.243,1.01,reviewed,us,earthquake,-68.217,-17.9029,208.326
-us6000lh2f,4.4,mb,1697854996522,1703625890040,"41 km E of Calama, Chile",0,,298,,,,32,50,0.558,0.7,reviewed,us,earthquake,-68.5199,-22.4891,133.073
-us6000lh3x,4.2,mb,1697868074148,1703625891040,"15 km E of Chiguayante, Chile",0,,273,3.0,4.1,,23,114,0.32,0.53,reviewed,us,earthquake,-72.8578,-36.9246,38.234
-us6000lh4h,4.3,mb,1697877220982,1703625892040,"34 km WNW of San Pedro de Atacama, Chile",0,,284,,,,26,66,0.345,1.12,reviewed,us,earthquake,-68.5212,-22.812,120.895
-us6000lh4u,4.2,mb,1697879938561,1703625892040,"12 km NNE of Camiña, Chile",0,,271,,,,18,99,0.5,0.49,reviewed,us,earthquake,-69.3991,-19.2047,106.894
-us6000lh77,4.2,mb,1697918467356,1703625895040,"44 km WSW of Arauco, Argentina",0,,271,,,,42,93,2.804,0.88,reviewed,us,earthquake,-67.2082,-28.7412,135.295
-us6000lhah,4.3,mb,1697971083277,1704342111040,"64 km SW of Calama, Chile",0,,284,,,,25,110,0.314,0.58,reviewed,us,earthquake,-69.3131,-22.9101,85.01
-us6000lhd0,4.3,mb,1698013339918,1704342113040,"48 km WNW of Abra Pampa, Argentina",0,,284,,,,25,89,1.954,0.77,reviewed,us,earthquake,-66.1162,-22.5131,259.453
-us6000lhfy,4.3,mb,1698049037360,1704342116040,"82 km NE of San Felipe, Chile",0,,284,,,,38,66,0.673,0.75,reviewed,us,earthquake,-70.1639,-32.1742,110.115
-us6000lhgg,4.5,mb,1698056676875,1704342117040,"22 km NNW of Albardón, Argentina",0,,312,,,,37,41,0.281,0.83,reviewed,us,earthquake,-68.6445,-31.2653,107.013
 us7000l5ww,4.1,mb,1698122001693,1704342123040,"42 km ENE of La Tirana, Chile",0,,259,1.0,2.0,,21,75,0.552,0.5,reviewed,us,earthquake,-69.2691,-20.219,98.86
 us7000l5yj,4.0,mb,1698146467890,1704342125040,"91 km NE of San Pedro de Atacama, Chile",0,,246,,,,13,185,0.841,0.35,reviewed,us,earthquake,-67.5908,-22.307,164.152
 us7000l60k,4.0,mb,1698162366126,1704342126040,"35 km ESE of Londres, Argentina",0,,246,,,,35,69,3.028,0.72,reviewed,us,earthquake,-66.8343,-27.8851,154.716
@@ -2502,30 +2486,30 @@ us7000thtd,4.5,mb,1789556229631,1791478742040,"31 km WSW of Ovalle, Chile",0,,31
 us7000ti3n,4.6,mb,1789660278117,1790283244240,"26 km WSW of Osorno, Chile",0,,326,1.0,2.2,,27,141,0.753,1.28,reviewed,us,earthquake,-73.4372,-40.6345,59.712
 us7000ti67,4.2,mb,1789683101739,1791254351040,"60 km NE of María Elena, Chile",0,,271,,,,23,73,0.146,0.65,reviewed,us,earthquake,-69.2655,-21.9418,87.28
 us7000tib9,4.1,mb,1789742559059,1791743662040,"75 km ESE of Palca, Peru",0,,259,,,,17,105,0.235,0.62,reviewed,us,earthquake,-69.3648,-18.1428,150.676
-us7000tid4,4.8,mwr,1789750327849,1790368608282,"28 km ENE of Villa Presidente Frei, Chile",0,,367,34.0,3.8,,89,39,0.175,0.91,reviewed,us,earthquake,-70.3171,-33.322,100.054
+us7000tid4,4.9,mww,1789750327775,1792687762040,"26 km NE of Villa Presidente Frei, Chile",0,,382,34.0,3.8,,89,39,0.178,1.16,reviewed,us,earthquake,-70.346,-33.3295,102.283
 us7000tijq,4.4,mb,1789824303262,1792005337040,"34 km NW of Coquimbo, Chile",0,,298,,,,95,98,0.347,0.72,reviewed,us,earthquake,-71.5585,-29.7099,37.948
-us7000tipx,4.8,mb,1789893171773,1792048035040,"59 km W of Cafayate, Argentina",0,,354,,,,32,117,2.85,0.74,reviewed,us,earthquake,-66.5641,-25.973,10.0
+us7000tipx,4.8,mb,1789893171773,1792436542040,"59 km W of Cafayate, Argentina",0,,354,,,,32,117,2.85,0.74,reviewed,us,earthquake,-66.5641,-25.973,10.0
 us7000tiq2,5.3,mww,1789894074359,1791028002578,"61 km WNW of Cafayate, Argentina",0,,433,3.0,3.4,,65,54,2.829,1.12,reviewed,us,earthquake,-66.5832,-25.958,10.0
-us7000tirs,4.6,mb,1789912515584,1790369930040,"38 km W of San Pedro de Atacama, Chile",0,,326,,,,31,46,0.361,1.35,reviewed,us,earthquake,-68.5704,-22.9629,110.65
-us7000tixc,5.2,mb,1789991309030,1791818417148,"170 km WNW of Mejillones, Chile",0,,416,1.0,1.0,,112,132,1.698,0.74,reviewed,us,earthquake,-71.8981,-22.3472,10.0
+us7000tirs,4.4,mwr,1789912515494,1792687982040,"43 km W of San Pedro de Atacama, Chile",0,,298,,,,31,46,0.411,1.33,reviewed,us,earthquake,-68.6251,-22.9643,117.128
+us7000tixc,4.9,mww,1789991311105,1792675937040,"170 km WNW of Mejillones, Chile",0,,369,1.0,1.0,,142,132,1.7,0.66,reviewed,us,earthquake,-71.8993,-22.3457,23.49
 us7000tixg,4.7,mb,1789993025104,1791817017040,"69 km W of Ollagüe, Chile",0,,340,,,,90,41,0.565,1.06,reviewed,us,earthquake,-68.9217,-21.2462,115.49
 us7000tizh,4.5,mb,1790012322560,1790440993040,"116 km SE of Ollagüe, Chile",0,,312,,,,31,114,1.081,0.74,reviewed,us,earthquake,-67.5392,-22.0428,193.19
 us7000tj45,4.4,mb,1790063765653,1792060946040,"87 km W of San Antonio de los Cobres, Argentina",0,,298,,,,25,81,1.667,0.72,reviewed,us,earthquake,-67.1724,-24.3471,193.718
 us7000tj4l,4.3,mb,1790069709965,1792070335040,"62 km NNE of Calama, Chile",0,,284,,,,58,98,0.61,0.59,reviewed,us,earthquake,-68.6113,-21.9687,109.9
-us6000tx0f,4.3,mb,1790132828150,1791075586135,"36 km NNW of La Serena, Chile",0,,285,1.0,2.7,,25,156,0.341,0.7,reviewed,us,earthquake,-71.4313,-29.6204,60.405
-us6000tx29,5.3,mww,1790155274739,1792072609887,"47 km NNE of Chilecito, Argentina",0,,434,4.0,4.3,,195,29,2.99,0.66,reviewed,us,earthquake,-67.302,-28.7705,121.407
+us6000tx0f,4.3,mb,1790132828150,1792436834040,"36 km NNW of La Serena, Chile",0,,285,1.0,2.7,,25,156,0.341,0.7,reviewed,us,earthquake,-71.4313,-29.6204,60.405
+us6000tx29,5.3,mww,1790155274739,1792557043868,"47 km NNE of Chilecito, Argentina",0,,434,4.0,4.3,,195,29,2.99,0.66,reviewed,us,earthquake,-67.302,-28.7705,121.407
 us6000tx4w,4.6,mb,1790182117534,1791234269040,"64 km WNW of San Antonio de los Cobres, Argentina",0,,326,0.0,1.0,,59,45,1.61,1.18,reviewed,us,earthquake,-66.9376,-24.0947,188.827
 us6000tx7j,3.8,mwr,1790211022123,1791926940040,"43 km S of Antofagasta, Chile",0,,222,,,,25,152,0.559,0.88,reviewed,us,earthquake,-70.3595,-24.0453,39.284
 us6000tx9m,4.4,mb,1790233624384,1791365428040,"57 km WSW of San Antonio, Chile",0,,298,,,,30,162,0.484,0.76,reviewed,us,earthquake,-72.1461,-33.8528,26.66
 us6000txhl,4.0,mb,1790291974921,1791763011040,"45 km WNW of El Huecú, Argentina",0,,246,,,,30,133,1.731,0.98,reviewed,us,earthquake,-71.049,-37.471,157.025
 us6000txme,5.2,mww,1790350147875,1791146040843,"69 km SW of San Antonio, Chile",0,,419,8.0,4.1,,102,51,0.579,1.07,reviewed,us,earthquake,-72.1838,-33.9903,18.7
-us6000txut,4.4,mb,1790452091708,1791045935040,"59 km W of Ollagüe, Chile",0,,298,,,,40,82,0.617,0.84,reviewed,us,earthquake,-68.82,-21.3183,111.572
+us6000txut,4.3,mwr,1790452091708,1792532701040,"59 km W of Ollagüe, Chile",0,,284,,,,40,82,0.617,0.84,reviewed,us,earthquake,-68.82,-21.3183,111.572
 us6000txwk,4.4,mb,1790482484488,1791933343040,"150 km WNW of Lebu, Chile",0,,298,,,,20,133,3.112,0.82,reviewed,us,earthquake,-75.2366,-37.1066,10.0
 us6000ty01,4.3,mb,1790535343669,1791048444831,"17 km SSE of Chaitén, Chile",0,,286,3.0,4.1,,23,136,0.599,0.46,reviewed,us,earthquake,-72.6484,-43.0656,10.0
 us6000tye9,4.1,mb,1790706109573,1791736219040,"101 km NE of San Pedro de Atacama, Chile",0,,259,,,,21,82,0.929,0.87,reviewed,us,earthquake,-67.4984,-22.2653,167.241
 us6000tyn5,4.0,mb,1790810451658,1792035474040,"17 km SW of Camiña, Chile",0,,246,,,,15,110,0.796,0.73,reviewed,us,earthquake,-69.5395,-19.4287,97.88
 us6000tz75,4.3,mwr,1790962098566,1792315858943,"32 km NNW of Valparaíso, Chile",0,,285,3.0,3.1,,37,146,0.272,0.76,reviewed,us,earthquake,-71.7298,-32.759,31.319
-us6000tzee,4.1,mb,1791062157294,1791156426040,"153 km WSW of Lebu, Chile",0,,259,,,,23,196,2.081,0.95,reviewed,us,earthquake,-75.1712,-38.3006,10.0
+us6000tzee,4.1,mb,1791062157294,1792473451040,"153 km WSW of Lebu, Chile",0,,259,,,,23,196,2.081,0.95,reviewed,us,earthquake,-75.1712,-38.3006,10.0
 us6000tzis,4.2,mb,1791115673879,1791119669040,"77 km ESE of Ollagüe, Chile",0,,271,,,,40,86,1.622,0.68,reviewed,us,earthquake,-67.5431,-21.4303,169.095
 us6000tzmz,4.2,mb,1791188702182,1791268252040,"172 km ESE of Antofagasta, Chile",0,,271,,,,28,118,0.957,0.99,reviewed,us,earthquake,-68.9222,-24.4199,94.083
 us6000tztx,4.4,mb,1791247288414,1792102783470,"60 km SSE of Camiña, Chile",0,,298,2.0,2.0,,34,80,0.15,0.65,reviewed,us,earthquake,-69.2136,-19.8187,105.001
@@ -2536,7 +2520,7 @@ us6000u0rx,4.7,mb,1791387975083,1792094088040,"46 km WNW of Ollagüe, Chile",0,,
 us6000u0wh,4.5,mb,1791437756118,1792236183040,"36 km NE of Calama, Chile",0,,312,,,,38,71,0.663,1.01,reviewed,us,earthquake,-68.6856,-22.214,123.147
 us6000u144,4.4,mb,1791528104238,1791786504040,"56 km W of Ollagüe, Chile",0,,298,,,,40,46,0.674,0.81,reviewed,us,earthquake,-68.7966,-21.2621,121.3
 us6000u153,5.1,mb,1791541334915,1791567564926,"72 km SSW of Colchane, Chile",0,,403,9.0,3.3,,98,48,0.41,0.76,reviewed,us,earthquake,-68.7905,-19.9128,123.835
-us6000u1mi,4.3,mb,1791754388230,1791758759040,"61 km WNW of San Antonio de los Cobres, Argentina",0,,284,,,,20,60,1.58,0.72,reviewed,us,earthquake,-66.8503,-23.9608,195.569
+us6000u1mi,4.3,mb,1791754389410,1792530679040,"81 km WNW of San Antonio de los Cobres, Argentina",0,,284,,,,21,101,1.414,0.7,reviewed,us,earthquake,-67.0477,-23.9157,210.056
 us6000u1r8,4.3,mb,1791800940890,1791893926040,"31 km ESE of Puente Alto, Chile",0,,284,,,,41,84,0.047,0.5,reviewed,us,earthquake,-70.2587,-33.7025,107.176
 us6000u1uq,4.8,mb,1791829038852,1791855483275,"23 km SW of San Antonio, Chile",0,,360,13.0,4.3,,47,133,0.176,0.6,reviewed,us,earthquake,-71.8113,-33.721,33.627
 us6000u1xk,4.0,mb,1791855863964,1791857639040,"62 km NW of Tomé, Chile",0,,246,,,,23,191,1.666,0.66,reviewed,us,earthquake,-73.4058,-36.1819,25.568
@@ -2551,3 +2535,6 @@ us6000u2kw,4.3,mb,1792095920509,1792122353846,"11 km SE of Huara, Chile",0,,287,
 us6000u2wc,4.4,mb,1792187219763,1792194838040,"80 km W of San Antonio de los Cobres, Argentina",0,,298,,,,29,77,1.623,0.93,reviewed,us,earthquake,-67.1137,-24.2543,160.307
 us6000u2xt,4.2,mwr,1792211296909,1792286910040,"71 km S of Camaná, Peru",0,,271,,,,29,139,2.576,1.06,reviewed,us,earthquake,-72.7858,-17.2615,35.0
 us6000u30x,4.6,mb,1792255965164,1792261560040,"88 km SSW of Uyuni, Bolivia",0,,326,,,,80,47,1.982,1.13,reviewed,us,earthquake,-67.2144,-21.1752,189.462
+us6000u3b9,4.5,mb,1792395215444,1792481184040,"79 km W of San Antonio de los Cobres, Argentina",0,,312,,,,64,49,1.637,0.92,reviewed,us,earthquake,-67.1004,-24.2627,170.26
+us6000u3ye,2.8,ml,1792617350450,1792649639374,"17 km SW of Pozo Almonte, Chile",0,,121,1.0,2.0,,9,86,0.217,0.58,reviewed,us,earthquake,-69.9156,-20.3503,46.359
+us6000u3zu,4.4,mb,1792631283006,1792635892040,"30 km NW of Albardón, Argentina",0,,298,,,,26,74,0.331,0.53,reviewed,us,earthquake,-68.7255,-31.2167,103.228

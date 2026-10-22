@@ -1,11 +1,11 @@
 """
-Aplicação web do projeto.
+Ponto de entrada da aplicação web.
 
 Para iniciar, a partir da raiz do projeto:
     streamlit run app/app.py
 
-Ao abrir, a aplicação carrega os dados já coletados ou, se ainda não
-existirem, roda a coleta configurada em src/coleta.py.
+Ao abrir, carrega os dados já coletados (ou roda a coleta de src/coleta.py) e
+monta a navegação entre as páginas de app/paginas/.
 """
 
 import sys
@@ -19,54 +19,22 @@ RAIZ = Path(__file__).resolve().parent.parent
 if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
 
-from src import coleta  # noqa: E402  (import depois do ajuste do sys.path)
+from comum import carregar_base_padrao  # noqa: E402  (import depois do ajuste do sys.path)
 
 
-st.set_page_config(page_title="Terremotos", layout="wide")
+st.set_page_config(page_title="Terremotos", page_icon=":earth:", layout="wide")
 
-
-@st.cache_data(show_spinner=False)
-def obter_dados(forcar: bool = False):
-    """
-    Cache: o Streamlit reexecuta este arquivo inteiro a cada clique.
-    Sem o cache, cada interação chamaria a API de novo.
-    """
-    return coleta.carregar_ou_coletar(forcar=forcar)
-
-
-st.title("Terremotos")
-
-filtro_mag = ("todas as magnitudes" if coleta.MAGNITUDE_MINIMA is None
-              else f"magnitude ≥ {coleta.MAGNITUDE_MINIMA:g}")
-st.caption(f"Região: {coleta.REGIAO} · {filtro_mag} · últimos {coleta.ANOS} anos · fonte: USGS")
-
-# Botão para baixar os dados de novo, ignorando o arquivo e o cache
-if st.sidebar.button("Atualizar dados da API"):
-    obter_dados.clear()
-    with st.spinner("Baixando dados atualizados do USGS..."):
-        df = obter_dados(forcar=True)
-    st.sidebar.success("Dados atualizados.")
-else:
-    primeira_vez = not coleta.arquivo_saida().exists()
-    mensagem = ("Primeira execução: baixando os dados do USGS. Pode levar alguns minutos..."
-                if primeira_vez else "Carregando dados...")
+if "df" not in st.session_state:
     try:
-        with st.spinner(mensagem):
-            df = obter_dados()
+        carregar_base_padrao()
     except Exception as erro:
-        st.error(f"Não foi possível obter os dados: {erro}")
-        st.stop()
+        st.error(f"Não foi possível obter os dados padrão: {erro}")
 
-if df.empty:
-    st.warning("A coleta não retornou nenhum evento com os filtros configurados.")
-    st.stop()
+st.sidebar.title("Terremotos")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Eventos", f"{len(df):,}".replace(",", "."))
-col2.metric("Maior magnitude", f"{df['mag'].max():.1f}")
-col3.metric("Com alerta de tsunami", int(df["tsunami"].fillna(0).sum()))
-
-st.subheader("Amostra dos dados")
-st.dataframe(df.head(100), use_container_width=True)
-
-st.caption(f"Arquivo: data/raw/{coleta.arquivo_saida().name}")
+navegacao = st.navigation([
+    st.Page("paginas/upload.py", title="Upload e dados", icon=":material/upload_file:", default=True),
+    st.Page("paginas/analise.py", title="Análise", icon=":material/bar_chart:"),
+    st.Page("paginas/mapa.py", title="Mapa", icon=":material/map:"),
+])
+navegacao.run()
