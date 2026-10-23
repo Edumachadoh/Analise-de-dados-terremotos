@@ -18,10 +18,10 @@ if arquivo is not None and st.session_state.get("arquivo_atual") != (arquivo.nam
         st.error(str(erro))
 
 col_a, col_b = st.columns([1, 1])
-if col_a.button("Usar a base padrão (USGS)"):
+if col_a.button(icon=":material/note:",label="Usar a base padrão (USGS)",use_container_width=True):
     carregar_base_padrao()
     st.session_state.pop("arquivo_atual", None)
-if col_b.button("Atualizar dados da API"):
+if col_b.button(icon=":material/cached:",label="Atualizar dados da API",use_container_width=True):
     carregar_base_padrao(forcar=True)
     st.session_state.pop("arquivo_atual", None)
 
@@ -30,7 +30,7 @@ st.caption(f"Base ativa: {origem()}")
 
 c1, c2, c3 = st.columns(3)
 c1.metric("Linhas", f"{len(df):,}".replace(",", "."))
-c2.metric("Colunas", df.shape[1])
+c2.metric("Colunas", df.shape[1],)
 c3.metric("Valores nulos", f"{df.isna().mean().mean() * 100:.1f}%")
 
 st.subheader("Amostra dos dados")
