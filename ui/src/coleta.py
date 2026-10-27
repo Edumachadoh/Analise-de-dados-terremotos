@@ -21,7 +21,7 @@ import requests
 # =============================================================================
 # CONFIGURAÇÃO DA COLETA — altere aqui os filtros
 # =============================================================================
-REGIAO = "chile"        # "global" ou uma das chaves de REGIOES abaixo
+REGIAO = "japao"        # "global" ou uma das chaves de REGIOES abaixo
 MAGNITUDE_MINIMA = None  # None = todas as magnitudes; ou um número, ex.: 5.0
 ANOS = 3                # quantos anos para trás, a partir de hoje
 FORMATO = "csv"         # "csv", "geojson" ou "ambos"

@@ -211,7 +211,7 @@ Os dados vêm do **ANSS Comprehensive Earthquake Catalog (ComCat)**, mantido pel
 |---|---|
 | Região | Chile |
 | Coordenadas | latitude de -56 a -17, longitude de -76 a -66 |
-| Magnitude | todas, sem limite mínimo |
+| Magnitude | > 2,5 |
 | Período | últimos 3 anos, contados a partir da data da coleta |
 | Tipo de evento | apenas terremotos (`eventtype=earthquake`) |
 | Arquivo gerado | `data/raw/terremotos_chile_mtodas_3anos.csv` |
