@@ -133,7 +133,7 @@ def _executar(coleta: Coleta, obter_registros) -> Coleta:
 
 
 def importar_do_usgs(anos: int, magnitude_minima: float | None = None) -> Coleta:
-    """Busca os terremotos do Chile dos últimos `anos` na API do USGS e grava."""
+    """Busca os terremotos do Japão dos últimos `anos` na API do USGS e grava."""
     coleta = Coleta.objects.create(anos=anos, magnitude_minima=magnitude_minima)
     return _executar(
         coleta,

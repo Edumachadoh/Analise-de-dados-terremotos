@@ -162,8 +162,8 @@ PASTA_MODELOS = MEDIA_ROOT / "modelos"
 # =============================================================================
 USGS_URL = "https://earthquake.usgs.gov/fdsnws/event/1"
 
-# Recorte retangular da região do Chile: (lat_min, lat_max, lon_min, lon_max)
-REGIAO_CHILE = (-56.0, -17.0, -76.0, -66.0)
+# Recorte retangular da região analisada (Japão): (lat_min, lat_max, lon_min, lon_max)
+REGIAO_ANALISE = (24.0, 46.0, 122.0, 146.0)
 
 # Base padrão: últimos 3 anos. Re-treino: últimos 6 anos.
 ANOS_COLETA_PADRAO = 3

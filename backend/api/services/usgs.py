@@ -44,7 +44,7 @@ def _get(metodo: str, params: dict) -> requests.Response:
 
 
 def _params(inicio: datetime, fim: datetime, magnitude_minima: float | None) -> dict:
-    lat_min, lat_max, lon_min, lon_max = settings.REGIAO_CHILE
+    lat_min, lat_max, lon_min, lon_max = settings.REGIAO_ANALISE
     params = {
         "starttime": inicio.strftime("%Y-%m-%dT%H:%M:%S"),
         "endtime": fim.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -78,7 +78,7 @@ def _baixar_janela(inicio, fim, magnitude_minima) -> list[dict]:
 
 def buscar_terremotos(anos: int, magnitude_minima: float | None = None) -> list[dict]:
     """
-    Baixa os terremotos do Chile dos últimos `anos`, em janelas de um ano.
+    Baixa os terremotos do Japão dos últimos `anos`, em janelas de um ano.
     Devolve a lista de features GeoJSON, sem duplicatas.
     """
     fim = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
