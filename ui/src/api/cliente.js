@@ -1,14 +1,9 @@
 // Cliente da API REST do back-end (Django REST Framework, pasta backend/).
 // Todas as telas buscam os dados por aqui; nenhuma lê arquivo ou banco direto.
 
-const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
+import { ErroApi } from './erro.js'
 
-export class ErroApi extends Error {
-  constructor(mensagem, status) {
-    super(mensagem)
-    this.status = status
-  }
-}
+const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
 
 async function requisitar(caminho, opcoes = {}) {
   let resposta
@@ -53,7 +48,9 @@ export function consulta(filtros = {}, extras = {}) {
   return texto ? `?${texto}` : ''
 }
 
-export const api = {
+export const apiReal = {
+  simulada: false,
+
   // ---------------------------------------------------------------- terremotos
   listarTerremotos: (filtros, pagina = 1, ordenacao = '-data_hora') =>
     requisitar(`/terremotos/${consulta(filtros, { page: pagina, ordering: ordenacao })}`),

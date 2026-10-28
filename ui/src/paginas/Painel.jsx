@@ -1,7 +1,7 @@
 // Tela 1: visão geral com as estatísticas calculadas pelo back (GET /api/estatisticas/...).
 // Todos os números respeitam os filtros da barra lateral.
 
-import { api } from '../api/cliente.js'
+import { api } from '../api/index.js'
 import { Aviso, Cabecalho, Carregando, Cartao, Metrica } from '../componentes/comuns.jsx'
 import { quantosFiltros } from '../componentes/Filtros.jsx'
 import { Barras, Dispersao, Linha, Rosca } from '../componentes/graficos.jsx'

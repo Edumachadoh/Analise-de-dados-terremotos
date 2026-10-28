@@ -2,7 +2,7 @@
 // e importação de dados novos (POST /api/coletas/ busca no USGS; envio de arquivo aguarda o back)
 
 import { useRef, useState } from 'react'
-import { api } from '../api/cliente.js'
+import { api } from '../api/index.js'
 import { Aviso, Cabecalho, Carregando, Cartao, Icone } from '../componentes/comuns.jsx'
 import { formatarData, formatarInteiro, formatarNumero } from '../lib/formato.js'
 import { rotulo, rotuloValor } from '../lib/rotulos.js'
@@ -177,7 +177,7 @@ function Importacao({ aoImportar }) {
         {ocupado?.startsWith('Buscando') && <p className="texto-explicacao">{ocupado}</p>}
       </Cartao>
 
-      <Cartao titulo="Enviar um arquivo" subtitulo="CSV com as colunas do USGS (id, mag, time, latitude, longitude, depth…)">
+      <Cartao titulo="Enviar um arquivo" subtitulo="CSV, JSON (inclusive GeoJSON) ou XML com as colunas do USGS: id, mag, time, latitude, longitude e depth">
         <div
           className={`upload${arrastando ? ' arrastando' : ''}`}
           onClick={() => entrada.current.click()}

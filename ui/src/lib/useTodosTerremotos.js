@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, consulta } from '../api/cliente.js'
+import { api, consulta } from '../api/index.js'
 
 // O back entrega 50 terremotos por página. Para o mapa e a dispersão é preciso juntar todas as
 // páginas, o que leva alguns segundos. Por isso o resultado fica em memória (compartilhado entre
