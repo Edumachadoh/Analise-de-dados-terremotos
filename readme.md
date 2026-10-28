@@ -1,8 +1,29 @@
 # Terremotos no Chile — USGS
 
-Aplicação web em Python para análise de terremotos registrados na região do Chile, com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS).
+Aplicação web para análise de terremotos registrados na região do Chile, com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS).
 
-Ao iniciar, a aplicação verifica se os dados já foram baixados. Se ainda não foram, ela consulta a API do USGS, salva os dados localmente e os exibe no navegador.
+## Estrutura do repositório
+
+O projeto tem duas partes que conversam **somente por uma API REST**:
+
+```
+├── backend/                  # API REST (Django + Django REST Framework)
+│   ├── api/, config/         #   a API: modelos, rotas, serviços de USGS, estatísticas e machine learning
+│   ├── data/raw/             #   CSVs de terremotos coletados do USGS
+│   ├── notebooks/            #   notebooks de análise (Data Science)
+│   └── scripts/              #   scripts do projeto antigo (coleta, preparo, modelos, clustering)
+├── ui/                       # interface web (React + Vite): veja ui/README.md
+└── readme.md
+```
+
+- **Para rodar o back e o front juntos**, siga o passo a passo de [`ui/README.md`](ui/README.md).
+- **`backend/scripts/`** guarda código do projeto antigo que **ainda não foi integrado à API**:
+  `preparo.py` lê arquivos CSV, JSON e XML (a API ainda não tem a rota de envio de arquivo) e
+  `coleta.py` coleta outras regiões além do Chile. `modelos.py`, `clustering.py` e os notebooks estão vazios.
+
+> **Atenção:** as seções **Como rodar o projeto**, **Estrutura do projeto** e **Fluxo de dados**, mais abaixo,
+> descrevem a versão antiga em Streamlit (pasta `app/`), que foi substituída pelo React em `ui/`. Elas precisam
+> ser reescritas. As seções **Dados utilizados** e **Limitações dos dados** continuam valendo.
 
 ---
 
