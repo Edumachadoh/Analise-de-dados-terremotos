@@ -6,7 +6,7 @@ import { Aviso, Cabecalho, Carregando, Cartao, Metrica } from '../componentes/co
 import { quantosFiltros } from '../componentes/Filtros.jsx'
 import { Barras, Dispersao, Linha, Rosca } from '../componentes/graficos.jsx'
 import { amostrar, formatarData, formatarInteiro, formatarMes, formatarNumero } from '../lib/formato.js'
-import { rotulo, rotuloValor } from '../lib/rotulos.js'
+import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 import { useTodosTerremotos } from '../lib/useTodosTerremotos.js'
 
@@ -57,7 +57,7 @@ export default function Painel({ filtros, versaoBase }) {
 
             <Cartao titulo="Terremotos por faixa de profundidade" subtitulo="Raso: até 70 km · intermediário: 70 a 300 km · profundo: mais de 300 km">
               {porProfundidade.dados ? (
-                <Rosca dados={porProfundidade.dados.map((d) => ({ nome: rotuloValor('faixa_profundidade', d.faixa), valor: d.total }))} />
+                <Rosca dados={porProfundidade.dados.map((d) => ({ nome: d.faixa, valor: d.total }))} />
               ) : <Carregando />}
             </Cartao>
 

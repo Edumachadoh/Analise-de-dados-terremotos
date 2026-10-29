@@ -1,13 +1,16 @@
-// Parte "dados" da API simulada: terremotos, estatísticas e importações.
-// Reproduz o que o back Django devolve (backend/api/views.py, filters.py, services/estatisticas.py),
-// com os mesmos nomes de campo e a mesma paginação de 50 em 50.
+// Parte "dados" da API local: terremotos, estatísticas e importações.
+// Os terremotos vêm direto da API do USGS (servico.js) e ficam em memória; filtros, estatísticas e paginação
+// são calculados aqui, reproduzindo o que o back Django devolve (backend/api/views.py, filters.py,
+// services/estatisticas.py), com os mesmos nomes de campo e a mesma paginação de 50 em 50.
 
 import Papa from 'papaparse'
 import { ErroApi } from '../erro.js'
+import { buscarTerremotos } from './servico.js'
 
 export const TAMANHO_PAGINA = 50
 const LIMITE_RASO = 70
 const LIMITE_INTERMEDIARIO = 300
+const ANOS_COLETA_PADRAO = 3 // igual a ANOS_COLETA_PADRAO do back
 const ALERTAS = ['green', 'yellow', 'orange', 'red']
 const COLUNAS_OBRIGATORIAS = ['id', 'mag', 'time', 'latitude', 'longitude', 'depth']
 
@@ -75,21 +78,55 @@ function terremotoDeRegistro(r) {
   }
 }
 
-// ------------------------------------------------------------------ carga inicial
-export async function carregarTerremotos() {
-  if (terremotos) return terremotos
-  const resposta = await fetch(`${import.meta.env.BASE_URL}mock/terremotos.csv`)
-  const { data } = Papa.parse(await resposta.text(), { header: true, dynamicTyping: true, skipEmptyLines: true })
-  terremotos = data.map(terremotoDeRegistro).map((t) => ({ ...t, id: proximoId++ }))
-  if (!coletas.length) {
-    const inicio = agora()
-    coletas.push({
-      id: 1, iniciada_em: inicio, finalizada_em: inicio, anos: 3, magnitude_minima: null,
-      origem: 'terremotos.csv', status: 'concluida', recebidos: terremotos.length,
-      novos: terremotos.length, atualizados: 0, mensagem: 'Dados de demonstração carregados do CSV do projeto.',
+// ------------------------------------------------------------------ carga inicial (API do USGS)
+// A primeira chamada baixa os últimos anos no USGS; as demais reaproveitam. Se falhar, a próxima tenta de novo.
+let carga = null
+
+export function carregarTerremotos() {
+  if (!carga) {
+    carga = baixarBase().catch((erro) => {
+      carga = null
+      throw erro
     })
   }
+  return carga
+}
+
+async function baixarBase() {
+  const inicio = agora()
+  const registros = await buscarTerremotos(ANOS_COLETA_PADRAO, null)
+  terremotos = []
+  const { novos, atualizados } = mesclar(terremotos, validos(registros))
+  coletas = [{
+    id: 1, iniciada_em: inicio, finalizada_em: agora(), anos: ANOS_COLETA_PADRAO, magnitude_minima: null,
+    origem: 'usgs', status: 'concluida', recebidos: registros.length, novos, atualizados, mensagem: '',
+  }]
   return terremotos
+}
+
+// Eventos sem magnitude, data ou coordenadas não servem para análise e são descartados
+function validos(registros) {
+  return registros.map(terremotoDeRegistro).filter((t) => t.data_hora
+    && [t.latitude, t.longitude, t.profundidade_km, t.magnitude].every(Number.isFinite))
+}
+
+// Soma à base: o evento que já existe (mesmo usgs_id) é atualizado, não duplicado
+function mesclar(base, lista) {
+  const existentes = new Map(base.map((t, i) => [t.usgs_id, i]))
+  let novos = 0
+  let atualizados = 0
+  for (const t of lista) {
+    if (existentes.has(t.usgs_id)) {
+      const i = existentes.get(t.usgs_id)
+      base[i] = { ...t, id: base[i].id }
+      atualizados++
+    } else {
+      base.push({ ...t, id: proximoId++ })
+      existentes.set(t.usgs_id, base.length - 1)
+      novos++
+    }
+  }
+  return { novos, atualizados }
 }
 
 // ------------------------------------------------------------------ filtros (iguais a filters.py)
@@ -234,21 +271,23 @@ export async function listarColetas() {
   return { count: results.length, next: null, previous: null, results }
 }
 
-// Não há rede aqui: a "busca no USGS" só confere os parâmetros e conta o que já está na amostra
+// Busca no USGS os últimos `anos` e soma à base. Em caso de falha, a importação fica registrada com status "erro"
+// (como no back, que responde 502).
 export async function importarDoUsgs(anos, magnitudeMinima) {
   const base = await carregarTerremotos()
   if (!Number.isInteger(anos) || anos < 1 || anos > 20) throw new ErroApi('anos: Informe um número inteiro entre 1 e 20.', 400)
   if (magnitudeMinima != null && !(magnitudeMinima >= -2 && magnitudeMinima <= 10)) {
     throw new ErroApi('magnitude_minima: Deve estar entre -2 e 10.', 400)
   }
-  await esperar(1500)
-  const maisRecente = Math.max(...base.map((t) => Date.parse(t.data_hora)))
-  const recebidos = base.filter((t) => Date.parse(t.data_hora) >= maisRecente - anos * 365 * 86400000
-    && (magnitudeMinima == null || t.magnitude >= magnitudeMinima)).length
-  return coletaNova({
-    anos, magnitude_minima: magnitudeMinima, recebidos, atualizados: recebidos,
-    mensagem: 'Simulação: nada foi baixado do USGS. Os dados são os da amostra do projeto.',
-  })
+  const iniciada = agora()
+  try {
+    const registros = await buscarTerremotos(anos, magnitudeMinima)
+    const { novos, atualizados } = mesclar(base, validos(registros))
+    return coletaNova({ iniciada_em: iniciada, anos, magnitude_minima: magnitudeMinima, recebidos: registros.length, novos, atualizados })
+  } catch (erro) {
+    coletaNova({ iniciada_em: iniciada, anos, magnitude_minima: magnitudeMinima, status: 'erro', mensagem: erro.message })
+    throw erro
+  }
 }
 
 // ------------------------------------------------------------------ envio de arquivo
@@ -299,23 +338,13 @@ export async function enviarArquivo(arquivo) {
   if (faltando.length) throw new ErroApi(`Colunas ausentes no arquivo: ${faltando.join(', ')}.`, 400)
   await esperar(500)
 
-  const existentes = new Map(base.map((t, i) => [t.usgs_id, i]))
-  let novos = 0
-  let atualizados = 0
-  for (const r of registros) {
+  const lista = registros.map((r) => {
     const t = terremotoDeRegistro(r)
-    if (!t.data_hora || [t.latitude, t.longitude, t.profundidade_km, t.magnitude].some(Number.isNaN)) {
+    if (!t.data_hora || ![t.latitude, t.longitude, t.profundidade_km, t.magnitude].every(Number.isFinite)) {
       throw new ErroApi(`O evento ${t.usgs_id} tem valores inválidos (data, coordenadas, profundidade ou magnitude).`, 400)
     }
-    if (existentes.has(t.usgs_id)) {
-      const i = existentes.get(t.usgs_id)
-      base[i] = { ...t, id: base[i].id }
-      atualizados++
-    } else {
-      base.push({ ...t, id: proximoId++ })
-      existentes.set(t.usgs_id, base.length - 1)
-      novos++
-    }
-  }
+    return t
+  })
+  const { novos, atualizados } = mesclar(base, lista)
   return coletaNova({ origem: arquivo.name.slice(0, 20), recebidos: registros.length, novos, atualizados })
 }

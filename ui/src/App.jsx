@@ -12,8 +12,8 @@ const PAGINAS = [
   { id: 'painel', nome: 'Painel', icone: 'painel', filtros: true },
   { id: 'mapa', nome: 'Mapa', icone: 'mapa', filtros: true },
   { id: 'dados', nome: 'Dados', icone: 'dados', filtros: true },
-  { id: 'modelos', nome: 'Modelos', icone: 'modelos' },
-  { id: 'previsoes', nome: 'Previsões', icone: 'previsoes' },
+  // { id: 'modelos', nome: 'Modelos', icone: 'modelos' },
+  // { id: 'previsoes', nome: 'Previsões', icone: 'previsoes' },
 ]
 
 export default function App() {
@@ -58,8 +58,8 @@ export default function App() {
         {pagina === 'painel' && <Painel filtros={filtros} versaoBase={versaoBase} />}
         {pagina === 'mapa' && <Mapa filtros={filtros} versaoBase={versaoBase} />}
         {pagina === 'dados' && <Dados filtros={filtros} versaoBase={versaoBase} aoMudarBase={aoMudarBase} />}
-        {pagina === 'modelos' && <Modelos aoMudarBase={aoMudarBase} />}
-        {pagina === 'previsoes' && <Previsoes versaoBase={versaoBase} />}
+        {/* {pagina === 'modelos' && <Modelos aoMudarBase={aoMudarBase} />}
+        {pagina === 'previsoes' && <Previsoes versaoBase={versaoBase} />} */}
       </main>
     </div>
   )

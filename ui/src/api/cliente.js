@@ -49,7 +49,7 @@ export function consulta(filtros = {}, extras = {}) {
 }
 
 export const apiReal = {
-  simulada: false,
+  local: false,
 
   // ---------------------------------------------------------------- terremotos
   listarTerremotos: (filtros, pagina = 1, ordenacao = '-data_hora') =>

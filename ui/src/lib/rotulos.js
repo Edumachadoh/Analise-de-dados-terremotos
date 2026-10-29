@@ -1,4 +1,4 @@
-// Nomes em português para exibir campos e valores que vêm da API.
+// Nomes em português para exibir os campos (colunas) que vêm da API. Os valores não são traduzidos.
 // A API continua usando os nomes dela (profundidade_km, tipo_magnitude...); a tradução é só na tela.
 
 const CAMPOS = {
@@ -47,34 +47,7 @@ const CAMPOS = {
   max_iter: 'Máximo de épocas',
 }
 
-const VALORES = {
-  tipo_magnitude: {
-    mb: 'Ondas de corpo',
-    ml: 'Local (Richter)',
-    md: 'Duração',
-    ms: 'Ondas de superfície',
-    mw: 'Momento',
-    mww: 'Momento (fase W)',
-    mwr: 'Momento regional',
-    mwc: 'Momento (centroide)',
-    mwb: 'Momento (ondas de corpo)',
-    mh: 'Manual',
-  },
-  tsunami: { true: 'Sim', false: 'Não' },
-  alerta: { green: 'Verde', yellow: 'Amarelo', orange: 'Laranja', red: 'Vermelho' },
-  status: { automatic: 'Automático', reviewed: 'Revisado', deleted: 'Excluído' },
-  rede: { us: 'USGS' },
-  faixa_profundidade: { raso: 'Raso (< 70 km)', intermediario: 'Intermediário (70–300 km)', profundo: 'Profundo (> 300 km)' },
-  status_coleta: { em_andamento: 'Em andamento', concluida: 'Concluída', erro: 'Erro' },
-  weights: { uniform: 'Iguais', distance: 'Por distância' },
-}
-
 export const rotulo = (campo) => CAMPOS[campo] ?? campo
-
-export function rotuloValor(campo, valor) {
-  if (valor == null || valor === '') return valor
-  return VALORES[campo]?.[String(valor).toLowerCase()] ?? valor
-}
 
 // Para usar no meio de uma frase: "Distribuição de magnitude" (mantém siglas como "ID")
 export function rotuloMinusculo(campo) {
@@ -82,5 +55,3 @@ export function rotuloMinusculo(campo) {
   return /^[A-ZÀ-Ý][a-zà-ÿ]/.test(texto) ? texto[0].toLowerCase() + texto.slice(1) : texto
 }
 
-// Opções de <select> a partir do dicionário de valores de um campo
-export const opcoesDeValores = (campo) => Object.entries(VALORES[campo] ?? {})

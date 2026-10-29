@@ -1,4 +1,4 @@
-// Erro devolvido pela API (real ou simulada), com a mensagem pronta para mostrar ao usuário
+// Erro devolvido pela API (do back ou do USGS), com a mensagem pronta para mostrar ao usuário
 export class ErroApi extends Error {
   constructor(mensagem, status) {
     super(mensagem)

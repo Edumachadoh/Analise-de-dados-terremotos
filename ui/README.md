@@ -1,16 +1,14 @@
 # Front-end (React) — pasta ui/
 
-Interface web do projeto. Ela conversa com o back-end (`backend/`, Django REST Framework)
-**somente pela API REST**: nenhuma tela lê arquivo ou banco de dados direto.
-
-O front **não depende do back para funcionar**: por padrão ele usa uma API simulada que roda no próprio
-navegador, com os mesmos endpoints e os mesmos formatos de resposta do back de verdade.
+Interface web do projeto. Por enquanto ela **busca os terremotos direto na API do USGS**, a mesma que o back
+(`backend/`, Django REST Framework) consome, então funciona **sem o back rodando**. Quando o back estiver pronto,
+é só trocar a fonte (veja abaixo): as telas não mudam.
 
 ## Como rodar
 
-### Só o front (não precisa do back)
+### Direto do USGS (não precisa do back)
 
-Pré-requisito: [Node.js](https://nodejs.org) 20 ou mais recente.
+Pré-requisitos: [Node.js](https://nodejs.org) 20 ou mais recente e conexão com a internet.
 
 ```bash
 cd ui
@@ -18,16 +16,17 @@ npm install
 npm run dev
 ```
 
-O navegador abre em `http://localhost:5173`, já com dados de exemplo. O que você fizer (importar arquivo,
-treinar modelo) fica na memória e **some ao recarregar a página**.
+O navegador abre em `http://localhost:5173`. Na primeira abertura, o front baixa os últimos 3 anos de terremotos do
+Chile no USGS (uns 4 segundos). O que você fizer (importar arquivo, treinar modelo) fica na memória e **some ao
+recarregar a página**, quando os dados são baixados de novo.
 
-### Com o back-end de verdade
+### Com o back-end
 
 1. Suba o back (passo a passo abaixo).
-2. Copie `ui/.env.example` para `ui/.env` e troque para `VITE_USAR_MOCK=false`.
+2. Copie `ui/.env.example` para `ui/.env` e troque para `VITE_FONTE=back`.
 3. Reinicie o `npm run dev`.
 
-Para voltar à API simulada, é só pôr `VITE_USAR_MOCK=true` (ou apagar o `.env`).
+Para voltar ao USGS direto, ponha `VITE_FONTE=usgs` (ou apague o `.env`).
 
 <details>
 <summary>Como subir o back-end</summary>
@@ -61,46 +60,55 @@ precisa configurar CORS. Se o back estiver em outro endereço, ajuste `VITE_API_
 
 ## Telas
 
-| Tela | O que mostra | Rotas da API usadas |
-|---|---|---|
-| **Painel** | totais, terremotos por mês, por faixa de magnitude e de profundidade, magnitude máxima por mês e dispersão profundidade × magnitude | `/estatisticas/…`, `/terremotos/` |
-| **Mapa** | epicentros no mapa, com cor e tamanho pela coluna escolhida (padrão: magnitude) | `/terremotos/` |
-| **Dados** | tabela paginada e ordenável, histórico de importações, busca de dados novos no USGS e envio de arquivo | `/terremotos/`, `/coletas/` |
-| **Modelos** | treinar um algoritmo escolhendo os parâmetros, ver as métricas contra o baseline e a importância das informações, ativar ou excluir modelos | `/modelos/…` |
-| **Previsões** | probabilidade de terremoto por região nos próximos 30 dias, em mapa e em tabela | `/previsoes/` |
+| Tela | O que mostra |
+|---|---|
+| **Painel** | totais, terremotos por mês, por faixa de magnitude e de profundidade, magnitude máxima por mês e dispersão profundidade × magnitude |
+| **Mapa** | epicentros no mapa, com cor e tamanho pela coluna escolhida (padrão: magnitude) |
+| **Dados** | tabela paginada e ordenável, histórico de importações, busca de dados novos no USGS e envio de arquivo |
+| **Modelos** | treinar um algoritmo escolhendo os parâmetros, ver as métricas contra o baseline e a importância das informações, ativar ou excluir modelos |
+| **Previsões** | probabilidade de terremoto por região nos próximos 30 dias, em mapa e em tabela |
 
 Os **filtros** da barra lateral (magnitude, profundidade, período, escala, tsunami, alerta e local) valem para
-Painel, Mapa e Dados ao mesmo tempo. Eles são enviados como parâmetros da API (`?magnitude_min=5&data_inicio=…`).
+Painel, Mapa e Dados ao mesmo tempo.
 
-Os nomes dos campos do back (`profundidade_km`, `tipo_magnitude`…) e os códigos dos valores (`mb`, `green`…)
-são traduzidos para a tela em [`src/lib/rotulos.js`](src/lib/rotulos.js). Para renomear algo na interface, é lá.
+Só o **nome das colunas** é traduzido para a tela, em [`src/lib/rotulos.js`](src/lib/rotulos.js); os valores aparecem
+como vêm da API (`mb`, `raso`, `reviewed`…).
 
-## A API simulada
+## De onde vêm os dados
 
-Fica em [`src/api/mock/`](src/api/mock). Ela implementa as mesmas rotas do back (listagem com filtros, ordenação e
-paginação de 50 em 50, estatísticas, coletas, modelos e previsões) e usa a mesma validação, inclusive as mensagens de erro.
-Os dados vêm de [`public/mock/terremotos.csv`](public/mock/terremotos.csv), uma **cópia** de
-`backend/data/raw/terremotos_chile_mtodas_3anos.csv` (o front não pode ler a pasta do back).
+A escolha da fonte fica em [`src/api/index.js`](src/api/index.js); as telas só chamam `api.…` e não sabem qual está ativa.
 
-Duas diferenças em relação ao back de verdade:
+| `VITE_FONTE` | De onde vêm os dados | Onde está o código |
+|---|---|---|
+| `usgs` (padrão) | API do USGS, chamada direto do navegador | `src/api/usgs/` |
+| `back` | API REST do back (Django) | `src/api/cliente.js` |
 
-- **Modelos.** Todos os algoritmos treinam o mesmo modelo simples, uma regressão logística escrita em JavaScript, que usa o mesmo
-  painel de células e períodos do back e o mesmo baseline. As métricas são reais desse modelo, não do algoritmo escolhido.
-  A tela Modelos avisa isso.
-- **Busca no USGS.** Não há rede: a "busca" só confere os parâmetros e conta o que já está na amostra.
+Na fonte `usgs`, só os **terremotos** vêm do USGS (`src/api/usgs/servico.js`, com a mesma consulta do back: recorte do
+Chile, janelas de 1 ano, contagem antes de baixar e novas tentativas). Todo o resto é calculado no navegador, com os mesmos
+nomes de campo, formatos de resposta, validações e mensagens de erro do back: filtros, ordenação, paginação de 50 em 50,
+estatísticas, histórico de importações, modelos e previsões. O botão **Buscar no USGS** da tela Dados também é de verdade:
+baixa os anos pedidos e soma à base, sem duplicar.
 
-Se o back mudar uma rota ou um formato, atualize também `src/api/mock/` para as duas continuarem iguais.
+Diferenças em relação ao back:
+
+- **Modelos.** Todos os algoritmos treinam o mesmo modelo simples, uma regressão logística escrita em JavaScript, que usa o
+  mesmo painel de células e períodos do back e o mesmo baseline. As métricas são reais desse modelo, não do algoritmo escolhido.
+  A tela Modelos avisa isso. Os números de cada algoritmo só virão com o back.
+- **Sem internet ou USGS fora do ar:** as telas mostram a mensagem de erro e tentam de novo ao trocar de tela.
+- **Nada é salvo:** modelos e importações vivem na memória da página.
+
+Se o back mudar uma rota ou um formato, atualize também `src/api/usgs/` para as duas fontes continuarem iguais.
 
 ## O que o back ainda não tem
 
-- **Envio de arquivo.** A tela Dados já tem o campo e a API simulada já aceita CSV, JSON (inclusive GeoJSON) e XML, mas a
+- **Envio de arquivo.** A tela Dados já tem o campo e a fonte `usgs` já aceita CSV, JSON (inclusive GeoJSON) e XML, mas a
   rota **não existe no back**. Contrato que o front espera:
   `POST /api/coletas/arquivo/`, corpo `multipart/form-data` com o campo `arquivo`, resposta `201` com a coleta
   (`id`, `origem`, `status`, `recebidos`, `novos`, `atualizados`…) e, em arquivo inválido, `400` com `{"detail": "mensagem"}`.
-  Colunas obrigatórias: `id`, `mag`, `time`, `latitude`, `longitude`, `depth`. Hoje, com o back real, a tela mostra uma
+  Colunas obrigatórias: `id`, `mag`, `time`, `latitude`, `longitude`, `depth`. Com `VITE_FONTE=back`, a tela mostra uma
   mensagem explicando que a rota falta. O código para ler os três formatos está em `backend/scripts/preparo.py`.
 - **Tamanho de página configurável.** O back entrega 50 terremotos por página. O mapa e a dispersão precisam de todos,
-  então o front baixa as 51 páginas (cerca de 3 a 5 segundos) e guarda o resultado em memória para as outras telas.
+  então, com `VITE_FONTE=back`, o front baixa as 51 páginas (cerca de 3 a 5 segundos) e guarda o resultado em memória.
   Se o back aceitasse `?page_size=` (`page_size_query_param` na classe de paginação), isso cairia para uma requisição.
 - **Previsões lentas.** `GET /api/previsoes/` leva uns 3 segundos com limite e uns 5 sem, porque o back remonta o painel
   de células a cada chamada. Por isso a tela abre com as 50 regiões mais prováveis.
@@ -112,13 +120,13 @@ Se o back mudar uma rota ou um formato, atualize também `src/api/mock/` para as
 ```
 ui/src/
 ├── api/
-│   ├── index.js              # escolhe entre a API real e a simulada (VITE_USAR_MOCK)
-│   ├── cliente.js            # chamadas HTTP à API real
-│   ├── erro.js               # ErroApi, usado pelas duas
-│   └── mock/                 # API simulada: dados.js (terremotos, estatísticas, coletas) e ml.js (modelos, previsões)
+│   ├── index.js              # escolhe a fonte dos dados (VITE_FONTE)
+│   ├── cliente.js            # chamadas HTTP ao back
+│   ├── erro.js               # ErroApi, usado pelas duas fontes
+│   └── usgs/                 # fonte USGS: servico.js (API do USGS), dados.js (terremotos, estatísticas, coletas), ml.js (modelos, previsões)
 ├── componentes/              # cartões, filtros, gráficos (Recharts), mapa base (Leaflet)
 ├── lib/
-│   ├── rotulos.js            # tradução de campos e valores
+│   ├── rotulos.js            # tradução dos nomes das colunas
 │   ├── formato.js            # números e datas em português
 │   ├── useCarregar.js        # busca na API com estado de carregamento e erro
 │   └── useTodosTerremotos.js # junta as páginas de terremotos, com progresso e cache
@@ -128,4 +136,4 @@ ui/src/
 
 Bibliotecas: [React](https://react.dev) + [Vite](https://vite.dev), [Recharts](https://recharts.org) (gráficos),
 [React Leaflet](https://react-leaflet.js.org) (mapa, com fundo do OpenStreetMap) e
-[Papa Parse](https://www.papaparse.com) (leitura de CSV na API simulada).
+[Papa Parse](https://www.papaparse.com) (leitura de CSV no envio de arquivo).

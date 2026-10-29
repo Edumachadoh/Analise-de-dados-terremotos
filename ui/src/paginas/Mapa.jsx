@@ -5,7 +5,7 @@ import { CircleMarker, Tooltip } from 'react-leaflet'
 import { Aviso, Cabecalho, Carregando, Cartao, Metrica, Seletor } from '../componentes/comuns.jsx'
 import { corDaRampa, limitesDe, MapaBase, RAMPA } from '../componentes/MapaBase.jsx'
 import { amostrar, formatarData, formatarInteiro, formatarNumero } from '../lib/formato.js'
-import { rotulo, rotuloValor } from '../lib/rotulos.js'
+import { rotulo } from '../lib/rotulos.js'
 import { useTodosTerremotos } from '../lib/useTodosTerremotos.js'
 
 const MAX_PONTOS = 3000
@@ -64,7 +64,7 @@ export default function Mapa({ filtros, versaoBase }) {
                   pathOptions={{ color: '#fff', weight: 1, fillColor: faixaCor ? corDaRampa(p[colCor], ...faixaCor) : 'var(--serie-1)', fillOpacity: 0.8 }}>
                   <Tooltip>
                     <strong>{p.local || 'Sem descrição do local'}</strong><br />
-                    Magnitude: {formatarNumero(p.magnitude)} ({rotuloValor('tipo_magnitude', p.tipo_magnitude)})<br />
+                    Magnitude: {formatarNumero(p.magnitude)} ({p.tipo_magnitude})<br />
                     Profundidade: {formatarNumero(p.profundidade_km)} km<br />
                     {formatarData(p.data_hora, true)}
                   </Tooltip>

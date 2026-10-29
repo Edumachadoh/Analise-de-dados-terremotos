@@ -3,7 +3,13 @@
 // Os filtros só são enviados ao clicar em "Aplicar", para não disparar uma consulta por tecla.
 
 import { useState } from 'react'
-import { opcoesDeValores } from '../lib/rotulos.js'
+
+// Valores que a API aceita em cada filtro, exatamente como vêm nos dados
+const VALORES = {
+  faixa_profundidade: ['raso', 'intermediario', 'profundo'],
+  tipo_magnitude: ['mb', 'ml', 'md', 'ms', 'mw', 'mww', 'mwr', 'mwc', 'mwb', 'mh'],
+  alerta: ['green', 'yellow', 'orange', 'red'],
+}
 
 export const FILTROS_VAZIOS = {
   magnitude_min: '',
@@ -31,7 +37,7 @@ export function Filtros({ filtros, aoAplicar }) {
   const opcoes = (campo, todos) => (
     <select value={rascunho[campo]} onChange={mudar(campo)}>
       <option value="">{todos}</option>
-      {opcoesDeValores(campo).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
+      {VALORES[campo].map((valor) => <option key={valor} value={valor}>{valor}</option>)}
     </select>
   )
 

@@ -1,14 +1,13 @@
-// Ponto único de acesso à API. As telas importam daqui e não sabem se falam com o back de verdade
-// ou com a API simulada.
+// Ponto único de acesso à API. As telas importam daqui e não sabem de onde os dados vêm.
 //
-//   VITE_USAR_MOCK=true  (padrão)  → API simulada no navegador, o back não precisa estar rodando
-//   VITE_USAR_MOCK=false           → API REST real (Django), em VITE_API_URL
+//   VITE_FONTE=usgs  (padrão)  → direto da API do USGS; o back não precisa estar rodando
+//   VITE_FONTE=back            → API REST do back (Django), em VITE_API_URL
 //
 // Configure em ui/.env (veja .env.example).
 
 import { apiReal, consulta } from './cliente.js'
-import { apiMock } from './mock/index.js'
+import { apiUsgs } from './usgs/index.js'
 
-export const api = import.meta.env.VITE_USAR_MOCK === 'false' ? apiReal : apiMock
+export const api = import.meta.env.VITE_FONTE === 'back' ? apiReal : apiUsgs
 export { consulta }
 export { ErroApi } from './erro.js'

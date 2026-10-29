@@ -1,4 +1,4 @@
-// Parte "modelos" da API simulada. Reproduz o contrato de backend/api/services/ml.py:
+// Parte "modelos" da API local. Reproduz o contrato de backend/api/services/ml.py:
 //   - o mesmo painel célula × período de 30 dias, com as mesmas 7 features e a mesma divisão temporal;
 //   - a mesma lista de algoritmos e a mesma validação de parâmetros;
 //   - as mesmas métricas (ROC AUC, precisão média, F1...) e o mesmo baseline (frequência histórica da célula).
@@ -6,7 +6,7 @@
 // As métricas são reais desse modelo de demonstração, não do algoritmo escolhido.
 
 import { ErroApi } from '../erro.js'
-import { carregarTerremotos, esperar } from './dados.js'
+import { carregarTerremotos, esperar, importarDoUsgs } from './dados.js'
 
 const DIAS_PERIODO = 30
 const PERIODOS_MINIMOS_TREINO = 6
@@ -360,8 +360,10 @@ function importancias(algoritmo, modelo, Xteste, yteste, aucTeste) {
 // ------------------------------------------------------------------ treino (POST /api/modelos/)
 export async function treinar(entrada) {
   const e = validarEntrada(entrada ?? {})
+  // Com atualizar_dados, busca no USGS os últimos anos antes de treinar (re-treino com dados novos)
+  if (e.atualizarDados) await importarDoUsgs(e.anos, null)
+  else await esperar(300)
   const base = await carregarTerremotos()
-  await esperar(e.atualizarDados ? 1500 : 400) // com atualizar_dados, o back buscaria no USGS antes de treinar
 
   let eventos = base
   if (e.anos) {

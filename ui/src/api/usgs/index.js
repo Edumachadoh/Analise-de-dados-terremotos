@@ -1,12 +1,12 @@
-// API simulada: tem os mesmos métodos do cliente real (api/cliente.js) e devolve os mesmos formatos,
-// mas roda toda no navegador, com os dados de public/mock/terremotos.csv.
-// Serve para o front funcionar antes de o back existir ou sem ele rodando.
+// API local: tem os mesmos métodos do cliente real (api/cliente.js) e devolve os mesmos formatos,
+// mas os terremotos vêm direto da API do USGS e todo o resto (filtros, estatísticas, modelos, previsões)
+// é calculado no navegador. Serve para o front funcionar enquanto o back não está conectado.
 
 import * as dados from './dados.js'
 import * as ml from './ml.js'
 
-export const apiMock = {
-  simulada: true,
+export const apiUsgs = {
+  local: true, // o treino de modelos roda no navegador, não no back
 
   listarTerremotos: dados.listarTerremotos,
   resumo: dados.resumo,

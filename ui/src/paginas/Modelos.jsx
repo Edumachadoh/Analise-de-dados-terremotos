@@ -6,7 +6,7 @@ import { api } from '../api/index.js'
 import { Aviso, Cabecalho, Carregando, Cartao, Metrica, Seletor } from '../componentes/comuns.jsx'
 import { BarrasHorizontais } from '../componentes/graficos.jsx'
 import { formatarData, formatarInteiro, formatarNumero, formatarPorcentagem } from '../lib/formato.js'
-import { rotulo, rotuloValor } from '../lib/rotulos.js'
+import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
 // O back só aceita estes três textos exatos (ChoiceField com 0.5, 1.0 e 2.0)
@@ -88,9 +88,9 @@ export default function Modelos({ aoMudarBase }) {
         em células e o modelo aprende com o histórico de cada uma.
       </Cabecalho>
 
-      {api.simulada && (
+      {api.local && (
         <Aviso>
-          <strong>Modo demonstração:</strong> todos os algoritmos treinam o mesmo modelo simples (uma regressão logística rodando no navegador).
+          <strong>Sem o back-end:</strong> todos os algoritmos treinam o mesmo modelo simples (uma regressão logística rodando no navegador).
           As métricas são reais desse modelo, não do algoritmo escolhido. Os números de cada algoritmo virão do back-end.
         </Aviso>
       )}
@@ -205,7 +205,7 @@ function montarParametros(algoritmo, valores) {
 
 function Parametro({ nome, definicao: p, valor, aoMudar }) {
   if (p.tipo === 'escolha') {
-    return <Seletor rotulo={rotulo(nome)} valor={valor} opcoes={p.opcoes.map((o) => [o, rotuloValor(nome, o)])} aoMudar={aoMudar} inline={false} />
+    return <Seletor rotulo={rotulo(nome)} valor={valor} opcoes={p.opcoes} aoMudar={aoMudar} inline={false} />
   }
   const numerico = p.tipo === 'int' || p.tipo === 'float'
   return (
