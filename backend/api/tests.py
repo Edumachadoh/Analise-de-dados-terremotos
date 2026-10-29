@@ -159,7 +159,7 @@ class ImportacaoTests(TestCase):
         resposta = APIClient().post("/api/coletas/", {"anos": 2}, format="json")
         self.assertEqual(resposta.status_code, 201)
         self.assertEqual(resposta.json()["novos"], 1)
-        buscar.assert_called_once_with(2, None)
+        buscar.assert_called_once_with(2, 2.5)
 
     @mock.patch("api.services.usgs.buscar_terremotos", side_effect=ErroUSGS("fora do ar"))
     def test_post_coleta_com_usgs_fora_do_ar(self, _):
@@ -229,7 +229,7 @@ class MlTests(TestCase):
         self.cliente.post("/api/modelos/", {"algoritmo": "arvore_decisao"}, format="json")
         ponto = self.cliente.get("/api/previsoes/?latitude=35.3&longitude=140.2").json()
         self.assertEqual(ponto["total_celulas"], 1)
-        self.assertEqual(self.cliente.get("/api/previsoes/?latitude=10&longitude=-70").status_code, 400)
+        self.assertEqual(self.cliente.get("/api/previsoes/?latitude=95&longitude=-70").status_code, 400)
 
     def test_sem_modelo_404(self):
         self.assertEqual(self.cliente.get("/api/previsoes/").status_code, 404)
@@ -245,7 +245,7 @@ class MlTests(TestCase):
         resposta = self.cliente.post("/api/modelos/", {"algoritmo": "arvore_decisao",
                                                        "atualizar_dados": True}, format="json")
         self.assertEqual(resposta.status_code, 201)
-        buscar.assert_called_once_with(6, None)
+        buscar.assert_called_once_with(6, 2.5)
         self.assertTrue(Terremoto.objects.filter(usgs_id="novo").exists())
 
     def test_apagar_modelo_remove_arquivo(self):

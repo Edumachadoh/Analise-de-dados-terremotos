@@ -4,7 +4,7 @@ Comando para carregar terremotos no banco.
     python manage.py importar_terremotos                     # USGS, últimos 3 anos
     python manage.py importar_terremotos --anos 6            # USGS, últimos 6 anos
     python manage.py importar_terremotos --magnitude-minima 4.5
-    python manage.py importar_terremotos --arquivo data/raw/terremotos_japao_mtodas_3anos.csv
+    python manage.py importar_terremotos --arquivo data/raw/terremotos_global_m2.5_3anos.csv
 """
 
 from django.conf import settings
@@ -15,13 +15,13 @@ from api.services.usgs import ErroUSGS
 
 
 class Command(BaseCommand):
-    help = "Importa terremotos do Japão a partir da API do USGS ou de um CSV."
+    help = "Importa terremotos do mundo inteiro a partir da API do USGS ou de um CSV."
 
     def add_arguments(self, parser):
         parser.add_argument("--anos", type=int, default=settings.ANOS_COLETA_PADRAO,
                             help="anos para trás, a partir de hoje (padrão: %(default)s)")
         parser.add_argument("--magnitude-minima", type=float, default=None,
-                            help="magnitude mínima; omita para todas")
+                            help="magnitude mínima (padrão: %s)" % settings.MAGNITUDE_MINIMA_COLETA)
         parser.add_argument("--arquivo", default=None,
                             help="CSV com as colunas do USGS, em vez da API")
 

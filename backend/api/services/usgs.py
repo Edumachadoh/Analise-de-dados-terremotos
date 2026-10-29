@@ -78,7 +78,7 @@ def _baixar_janela(inicio, fim, magnitude_minima) -> list[dict]:
 
 def buscar_terremotos(anos: int, magnitude_minima: float | None = None) -> list[dict]:
     """
-    Baixa os terremotos do Japão dos últimos `anos`, em janelas de um ano.
+    Baixa os terremotos do mundo inteiro dos últimos `anos`, em janelas de um ano.
     Devolve a lista de features GeoJSON, sem duplicatas.
     """
     fim = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)

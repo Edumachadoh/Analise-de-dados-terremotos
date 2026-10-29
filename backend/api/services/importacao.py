@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 import pandas as pd
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone as dj_timezone
 
@@ -24,6 +25,8 @@ CAMPOS_ATUALIZAVEIS = [
     "intensidade_relatada", "intensidade_estimada", "estacoes", "lacuna_azimutal",
     "distancia_estacao", "rms", "status", "rede",
 ]
+
+LOTE_CONSULTA = 10_000  # ids por consulta ao verificar quais eventos já existem
 
 
 # -----------------------------------------------------------------------------
@@ -97,7 +100,11 @@ def salvar_terremotos(terremotos: list[Terremoto]) -> tuple[int, int]:
     Devolve (novos, atualizados).
     """
     ids = [t.usgs_id for t in terremotos]
-    existentes = dict(Terremoto.objects.filter(usgs_id__in=ids).values_list("usgs_id", "id"))
+    # Consulta em lotes: o SQLite aceita no máximo 32.766 variáveis por consulta
+    existentes = {}
+    for i in range(0, len(ids), LOTE_CONSULTA):
+        existentes.update(Terremoto.objects.filter(usgs_id__in=ids[i:i + LOTE_CONSULTA])
+                          .values_list("usgs_id", "id"))
 
     novos, atualizar = [], []
     for t in terremotos:
@@ -133,8 +140,13 @@ def _executar(coleta: Coleta, obter_registros) -> Coleta:
 
 
 def importar_do_usgs(anos: int, magnitude_minima: float | None = None) -> Coleta:
-    """Busca os terremotos do Japão dos últimos `anos` na API do USGS e grava."""
-    coleta = Coleta.objects.create(anos=anos, magnitude_minima=magnitude_minima)
+    """
+    Busca os terremotos do mundo inteiro dos últimos `anos` na API do USGS e grava.
+    Sem magnitude_minima, usa settings.MAGNITUDE_MINIMA_COLETA.
+    """
+    if magnitude_minima is None:
+        magnitude_minima = settings.MAGNITUDE_MINIMA_COLETA
+    coleta =Coleta.objects.create(anos=anos, magnitude_minima=magnitude_minima)
     return _executar(
         coleta,
         lambda: [registro_de_feature(f) for f in usgs.buscar_terremotos(anos, magnitude_minima)],

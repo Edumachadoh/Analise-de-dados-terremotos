@@ -2,11 +2,13 @@
 Machine learning: probabilidade de terremoto por região no próximo período.
 
 A pergunta respondida é:
-    "Quais regiões do Japão têm maior probabilidade de registrar um terremoto
+    "Quais regiões do mundo têm maior probabilidade de registrar um terremoto
      de magnitude >= X nos próximos 30 dias?"
 
 Como funciona:
-1. O Japão é dividido em células (padrão: 1° x 1°, cerca de 110 km de lado).
+1. O mundo é dividido em células (padrão: 1° x 1°, cerca de 110 km de lado).
+   Entram só as células com ao menos um terremoto na base: o resto (oceanos e
+   regiões estáveis) seria dezenas de milhares de linhas sempre negativas.
 2. O tempo é dividido em períodos de 30 dias, contados para trás a partir do
    terremoto mais recente da base. Assim nenhum período fica incompleto.
 3. Para cada célula e período, o alvo é: houve ao menos um terremoto com
@@ -243,15 +245,6 @@ def _dataframe(queryset) -> pd.DataFrame:
     return df
 
 
-def _grade(tamanho_celula: float) -> pd.DataFrame:
-    """Todas as células do recorte do Japão (canto inferior esquerdo de cada uma)."""
-    lat_min, lat_max, lon_min, lon_max = settings.REGIAO_ANALISE
-    lats = np.arange(lat_min, lat_max, tamanho_celula)
-    lons = np.arange(lon_min, lon_max, tamanho_celula)
-    return pd.DataFrame([(round(a, 4), round(o, 4)) for a in lats for o in lons],
-                        columns=["cel_lat", "cel_lon"])
-
-
 def _celula(valor, origem, tamanho):
     """Canto da célula que contém o valor: origem + n * tamanho."""
     return np.round(origem + np.floor((valor - origem) / tamanho) * tamanho, 4)
@@ -289,10 +282,11 @@ def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float
     alvo = (df[df["magnitude"] >= magnitude_alvo]
             .groupby(["cel_lat", "cel_lon", "periodo"]).size().rename("n_alvo"))
 
-    # Produto cartesiano: toda célula em todo período, inclusive os sem eventos
+    # Produto cartesiano: toda célula ativa em todo período, inclusive os sem eventos
     ultimo = n_periodos + (1 if incluir_proximo else 0)
     periodos = pd.DataFrame({"periodo": range(ultimo)})
-    painel = _grade(tamanho_celula).merge(periodos, how="cross")
+    celulas = df[["cel_lat", "cel_lon"]].drop_duplicates()
+    painel = celulas.merge(periodos, how="cross")
     painel = (painel.set_index(["cel_lat", "cel_lon", "periodo"])
               .join(total).join(alvo).fillna(0).reset_index())
     painel = painel.sort_values(["cel_lat", "cel_lon", "periodo"]).reset_index(drop=True)

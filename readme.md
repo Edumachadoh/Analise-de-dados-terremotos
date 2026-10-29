@@ -1,6 +1,6 @@
-# Terremotos no Chile — USGS
+# Terremotos no mundo — USGS
 
-Aplicação web para análise de terremotos registrados na região do Chile, com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS).
+Aplicação web para análise de terremotos registrados no mundo inteiro, com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS).
 
 ## Estrutura do repositório
 
@@ -19,21 +19,67 @@ O projeto tem duas partes que conversam **somente por uma API REST**:
 - **Para rodar o back e o front juntos**, siga o passo a passo de [`ui/README.md`](ui/README.md).
 - **`backend/scripts/`** guarda código do projeto antigo que **ainda não foi integrado à API**:
   `preparo.py` lê arquivos CSV, JSON e XML (a API ainda não tem a rota de envio de arquivo) e
-  `coleta.py` coleta outras regiões além do Chile. `modelos.py`, `clustering.py` e os notebooks estão vazios.
+  `coleta.py` gera CSVs por região (Chile, Japão, Indonésia, Califórnia ou global). `modelos.py`, `clustering.py` e os notebooks estão vazios.
 
 > **Atenção:** as seções **Como rodar o projeto**, **Estrutura do projeto** e **Fluxo de dados**, mais abaixo,
 > descrevem a versão antiga em Streamlit (pasta `app/`), que foi substituída pelo React em `ui/`. Elas precisam
-> ser reescritas. As seções **Dados utilizados** e **Limitações dos dados** continuam valendo.
+> ser reescritas. As seções **Dados na API**, **Dados utilizados** e **Limitações dos dados** estão atualizadas.
 
 ---
 
 ## Sumário
 
-1. [Como rodar o projeto](#como-rodar-o-projeto)
-2. [Estrutura do projeto](#estrutura-do-projeto)
-3. [Fluxo de dados](#fluxo-de-dados)
-4. [Dados utilizados](#dados-utilizados)
-5. [Limitações dos dados](#limitações-dos-dados)
+1. [Dados na API](#dados-na-api)
+2. [Como rodar o projeto](#como-rodar-o-projeto)
+3. [Estrutura do projeto](#estrutura-do-projeto)
+4. [Fluxo de dados](#fluxo-de-dados)
+5. [Dados utilizados](#dados-utilizados)
+6. [Limitações dos dados](#limitações-dos-dados)
+
+---
+
+## Dados na API
+
+A API guarda os terremotos no banco SQLite (`backend/db.sqlite3`). Os dados vêm do USGS e cobrem **o mundo inteiro**, com **magnitude a partir de 2,5**, nos **últimos 3 anos**.
+
+### Configuração
+
+Os parâmetros da coleta ficam em `backend/config/settings.py`:
+
+```python
+REGIAO_ANALISE = (-90.0, 90.0, -180.0, 180.0)  # (lat_min, lat_max, lon_min, lon_max): mundo inteiro
+MAGNITUDE_MINIMA_COLETA = 2.5                  # magnitude mínima padrão da coleta
+ANOS_COLETA_PADRAO = 3                         # base padrão: últimos 3 anos
+ANOS_RETREINO = 6                              # re-treino com atualização: últimos 6 anos
+```
+
+Para analisar só uma região, basta trocar `REGIAO_ANALISE` por um recorte menor. Por exemplo, Japão: `(24.0, 46.0, 122.0, 146.0)`.
+
+### Carregar os dados
+
+Com o ambiente do `backend/` ativo:
+
+```bash
+python manage.py importar_terremotos                         # USGS, últimos 3 anos, M >= 2,5
+python manage.py importar_terremotos --anos 6                # últimos 6 anos
+python manage.py importar_terremotos --magnitude-minima 4.0  # outra magnitude mínima
+python manage.py importar_terremotos --arquivo caminho.csv   # a partir de um CSV com as colunas do USGS
+```
+
+A mesma importação pode ser feita pela API (`POST /api/coletas/`) ou pela tela **Dados** da interface. Eventos que já estão no banco são atualizados, não duplicados, porque a comparação é feita pelo `id` do USGS.
+
+### Base atual
+
+| | |
+|---|---|
+| Terremotos | 83.306 |
+| Com magnitude ≥ 4 | 49.408 |
+| Magnitude | de 2,5 a 8,8 |
+| Período | 30/10/2023 a 29/10/2026 |
+
+### Impacto no modelo de machine learning
+
+O modelo divide o mapa em células de 1° × 1° (cerca de 110 km de lado) e estima, para cada uma, a probabilidade de um terremoto acima da magnitude-alvo nos próximos 30 dias. No mundo inteiro, a grade completa teria 64.800 células, e a maioria delas fica em oceanos ou em regiões estáveis que nunca registram eventos. Por isso **só entram as células com ao menos um terremoto na base**. Com a base atual e magnitude-alvo 4,0, são 5.393 células e cerca de 189 mil linhas de treino.
 
 ---
 
@@ -230,24 +276,26 @@ Os dados vêm do **ANSS Comprehensive Earthquake Catalog (ComCat)**, mantido pel
 
 | Critério | Valor |
 |---|---|
-| Região | Chile |
-| Coordenadas | latitude de -56 a -17, longitude de -76 a -66 |
-| Magnitude | > 2,5 |
+| Região | mundo inteiro |
+| Coordenadas | latitude de -90 a 90, longitude de -180 a 180 |
+| Magnitude | ≥ 2,5 |
 | Período | últimos 3 anos, contados a partir da data da coleta |
 | Tipo de evento | apenas terremotos (`eventtype=earthquake`) |
-| Arquivo gerado | `data/raw/terremotos_chile_mtodas_3anos.csv` |
+| Destino | banco da API (`backend/db.sqlite3`) |
 
-O recorte é um retângulo geográfico. Por isso ele inclui também parte do Oceano Pacífico e pequenas áreas de países vizinhos, como Argentina, Bolívia e Peru.
+### Por que magnitude mínima de 2,5
+
+Sem filtro de magnitude, o catálogo tem cerca de **428 mil** terremotos no mundo em 3 anos. A maioria são microtremores registrados pela rede densa de sensores dos EUA, o que concentraria a base artificialmente nesse país e deixaria a importação e o treino muito mais lentos. Com magnitude ≥ 2,5, a base fica com cerca de **83 mil** eventos e ainda inclui tremores pequenos, que o modelo usa como sinal de atividade da região. Com magnitude ≥ 4, seriam cerca de 49 mil.
 
 ### Requisição utilizada
 
 Os dados são baixados em GeoJSON, porque é o formato que traz os campos de impacto (`tsunami`, `alert`, `sig`), ausentes no CSV da API. Exemplo de uma das requisições feitas pela coleta, para uma janela de um ano:
 
 ```
-https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-18T00:00:00&endtime=2026-10-18T00:00:00&eventtype=earthquake&minlatitude=-56&maxlatitude=-17&minlongitude=-76&maxlongitude=-66
+https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-29T00:00:00&endtime=2026-10-29T00:00:00&eventtype=earthquake&minlatitude=-90&maxlatitude=90&minlongitude=-180&maxlongitude=180&minmagnitude=2.5
 ```
 
-Como não há filtro de magnitude, o parâmetro `minmagnitude` não é enviado. Assim a API devolve todos os eventos, inclusive os de magnitude negativa, que existem nas escalas locais.
+A API do USGS devolve no máximo 20.000 eventos por consulta. Como um ano do mundo inteiro passa desse limite, a coleta confere o total pelo método `count` e divide a janela ao meio até cada parte caber numa consulta.
 
 ### Colunas do arquivo
 
@@ -309,20 +357,20 @@ Na etapa de tratamento, são criados a partir das colunas originais:
 
 As faixas de profundidade seguem a classificação usual em sismologia.
 
-### Por que o Chile
+### Por que o mundo inteiro
 
-O Chile fica sobre a zona de subducção onde a Placa de Nazca mergulha sob a Placa Sul-Americana, uma das regiões sismicamente mais ativas do mundo. Isso garante um volume grande de eventos em poucos anos e permite observar terremotos rasos, junto à costa, e profundos, sob a cordilheira, numa mesma base.
+A pergunta do projeto é onde existe maior chance de um terremoto acima de uma magnitude. Restringir a base a um país deixaria de fora regiões muito ativas, como o Japão, a Indonésia e a costa do Pacífico das Américas. Com a base global, o modelo compara todas as zonas sísmicas entre si, e a análise visual mostra o Círculo de Fogo do Pacífico e as demais bordas de placas tectônicas.
 
 ---
 
 ## Limitações dos dados
 
-- **Escalas de magnitude diferentes.** Sem limite mínimo, a base mistura tremores pequenos, medidos em escalas locais como a `ml`, com eventos grandes, medidos pela magnitude de momento (`mww`). As escalas não são diretamente equivalentes, e o campo `magType` deve ser considerado nas análises.
-- **Completude desigual.** Tremores muito pequenos só são detectados perto das estações sismográficas. A ausência de eventos pequenos numa área pode refletir falta de cobertura, não falta de atividade.
+- **Escalas de magnitude diferentes.** A base mistura tremores pequenos, medidos em escalas locais como a `ml`, com eventos grandes, medidos pela magnitude de momento (`mww`). As escalas não são diretamente equivalentes, e o campo `magType` deve ser considerado nas análises.
+- **Completude desigual.** Tremores pequenos só são detectados perto das estações sismográficas, e a densidade de estações varia muito entre países. Mesmo com magnitude ≥ 2,5, regiões com redes densas (EUA, Japão) registram mais eventos pequenos que regiões remotas ou oceânicas. A ausência de eventos numa área pode refletir falta de cobertura, não falta de atividade.
 - **Campos de impacto quase vazios.** `felt`, `cdi`, `mmi` e `alert` só existem quando houve relatos da população ou avaliação de impacto, o que é raro em tremores pequenos.
 - **`tsunami` indica uma mensagem, não um tsunami.** O valor 1 significa que o USGS emitiu um aviso, segundo um protocolo baseado principalmente em magnitude e localização. Não confirma que uma onda ocorreu.
 - **Dados revisáveis.** Eventos recentes podem estar com `status=automatic` e ter localização ou magnitude ajustadas depois.
-- **Recorte retangular.** O retângulo da coleta não segue as fronteiras do país e inclui áreas oceânicas e de países vizinhos.
+- **Células, não cidades.** O modelo trabalha com células de latitude e longitude. O nome de um lugar só aparece no campo `place` do USGS (ex.: "45 km E of Sendai, Japan"), que descreve a posição em relação à cidade mais próxima.
 - **Variáveis físicas ausentes.** O catálogo não traz o mecanismo de falha nem o deslocamento do fundo do mar.
 
 ---
