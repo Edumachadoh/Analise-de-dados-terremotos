@@ -162,8 +162,12 @@ PASTA_MODELOS = MEDIA_ROOT / "modelos"
 # =============================================================================
 USGS_URL = "https://earthquake.usgs.gov/fdsnws/event/1"
 
-# Recorte retangular da região do Chile: (lat_min, lat_max, lon_min, lon_max)
-REGIAO_CHILE = (-56.0, -17.0, -76.0, -66.0)
+# Recorte retangular da região analisada (mundo inteiro): (lat_min, lat_max, lon_min, lon_max)
+REGIAO_ANALISE = (-90.0, 90.0, -180.0, 180.0)
+
+# Magnitude mínima padrão da coleta. Sem filtro, o mundo tem ~430 mil eventos em
+# 3 anos, a maioria microtremores registrados pela rede densa dos EUA.
+MAGNITUDE_MINIMA_COLETA = 2.5
 
 # Base padrão: últimos 3 anos. Re-treino: últimos 6 anos.
 ANOS_COLETA_PADRAO = 3

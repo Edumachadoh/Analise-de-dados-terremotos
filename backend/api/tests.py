@@ -24,17 +24,17 @@ AGORA = datetime(2026, 10, 1, tzinfo=timezone.utc)
 
 
 def criar_terremoto(**campos) -> Terremoto:
-    padrao = dict(usgs_id=f"t{Terremoto.objects.count()}", latitude=-33.0, longitude=-71.0,
-                  profundidade_km=30, magnitude=4.0, data_hora=AGORA, local="Teste, Chile")
+    padrao = dict(usgs_id=f"t{Terremoto.objects.count()}", latitude=35.7, longitude=139.7,
+                  profundidade_km=30, magnitude=4.0, data_hora=AGORA, local="Teste, Japão")
     padrao.update(campos)
     return Terremoto.objects.create(**padrao)
 
 
-def feature_usgs(id_, mag=4.6, lat=-30.2, lon=-71.4, prof=40.0, dias_atras=10):
+def feature_usgs(id_, mag=4.6, lat=38.3, lon=142.4, prof=40.0, dias_atras=10):
     """Uma feature no formato GeoJSON devolvido pelo USGS."""
     ms = int((AGORA - timedelta(days=dias_atras)).timestamp() * 1000)
     return {"id": id_, "geometry": {"coordinates": [lon, lat, prof]},
-            "properties": {"mag": mag, "time": ms, "updated": ms, "place": "Teste, Chile",
+            "properties": {"mag": mag, "time": ms, "updated": ms, "place": "Teste, Japão",
                            "tsunami": 0, "magType": "mb", "felt": None, "alert": None}}
 
 
@@ -43,7 +43,7 @@ def criar_base_sintetica(meses=24, semente=0):
     Base com atividade concentrada em três células, para o ML ter padrão a aprender.
     """
     gerador = np.random.default_rng(semente)
-    focos = [(-21.5, -68.5, 0.6), (-23.5, -66.5, 0.4), (-30.5, -71.5, 0.3)]
+    focos = [(35.5, 140.5, 0.6), (38.5, 142.5, 0.4), (33.5, 135.5, 0.3)]
     terremotos = []
     for dia in range(meses * 30):
         for lat, lon, chance in focos:
@@ -80,7 +80,7 @@ class TerremotoApiTests(TestCase):
         self.assertEqual(self.cliente.get("/api/terremotos/?magnitude_min=abc").status_code, 400)
 
     def test_crud(self):
-        dados = {"usgs_id": "manual", "latitude": -33.4, "longitude": -70.6,
+        dados = {"usgs_id": "manual", "latitude": 35.7, "longitude": 139.8,
                  "profundidade_km": 30, "magnitude": 4.2, "data_hora": "2026-10-01T12:00:00Z"}
         criado = self.cliente.post("/api/terremotos/", dados, format="json")
         self.assertEqual(criado.status_code, 201)
@@ -91,7 +91,7 @@ class TerremotoApiTests(TestCase):
         self.assertEqual(self.cliente.get(url).status_code, 404)
 
     def test_validacao_de_faixas(self):
-        dados = {"usgs_id": "x", "latitude": -120, "longitude": -70.6,
+        dados = {"usgs_id": "x", "latitude": -120, "longitude": 139.8,
                  "profundidade_km": 30, "magnitude": 14, "data_hora": "2026-10-01T12:00:00Z"}
         resposta = self.cliente.post("/api/terremotos/", dados, format="json")
         self.assertEqual(resposta.status_code, 400)
@@ -99,7 +99,7 @@ class TerremotoApiTests(TestCase):
         self.assertIn("magnitude", resposta.json())
 
     def test_usgs_id_unico(self):
-        dados = {"usgs_id": "t0", "latitude": -33, "longitude": -70, "profundidade_km": 10,
+        dados = {"usgs_id": "t0", "latitude": 35, "longitude": 140, "profundidade_km": 10,
                  "magnitude": 4, "data_hora": "2026-10-01T12:00:00Z"}
         self.assertEqual(self.cliente.post("/api/terremotos/", dados, format="json").status_code, 400)
 
@@ -147,9 +147,9 @@ class ImportacaoTests(TestCase):
         self.assertEqual(Terremoto.objects.get(usgs_id="a").magnitude, 5.1)
 
     def test_converte_coordenadas_e_tempo(self):
-        registro = importacao.registro_de_feature(feature_usgs("a", lat=-30, lon=-71, prof=12))
+        registro = importacao.registro_de_feature(feature_usgs("a", lat=38, lon=142, prof=12))
         terremoto = importacao.terremoto_de_registro(registro)
-        self.assertEqual((terremoto.latitude, terremoto.longitude), (-30, -71))
+        self.assertEqual((terremoto.latitude, terremoto.longitude), (38, 142))
         self.assertEqual(terremoto.profundidade_km, 12)
         self.assertEqual(terremoto.data_hora, AGORA - timedelta(days=10))
 
@@ -159,7 +159,7 @@ class ImportacaoTests(TestCase):
         resposta = APIClient().post("/api/coletas/", {"anos": 2}, format="json")
         self.assertEqual(resposta.status_code, 201)
         self.assertEqual(resposta.json()["novos"], 1)
-        buscar.assert_called_once_with(2, None)
+        buscar.assert_called_once_with(2, 2.5)
 
     @mock.patch("api.services.usgs.buscar_terremotos", side_effect=ErroUSGS("fora do ar"))
     def test_post_coleta_com_usgs_fora_do_ar(self, _):
@@ -200,7 +200,7 @@ class MlTests(TestCase):
         """A feature de um período só pode depender de períodos anteriores."""
         df = ml._dataframe(Terremoto.objects.all())
         painel, _ = ml.montar_painel(df, 4.5, 1.0)
-        celula = painel[(painel.cel_lat == -22) & (painel.cel_lon == -69)].sort_values("periodo")
+        celula = painel[(painel.cel_lat == 35) & (painel.cel_lon == 140)].sort_values("periodo")
         np.testing.assert_array_equal(celula["eventos_periodo_anterior"].iloc[1:].to_numpy(),
                                       celula["n_alvo"].iloc[:-1].to_numpy())
 
@@ -223,13 +223,13 @@ class MlTests(TestCase):
         self.assertEqual(len(dados["celulas"]), 3)
         # o foco mais ativo deve estar entre as regiões mais prováveis
         centros = [(c["centro"]["latitude"], c["centro"]["longitude"]) for c in dados["celulas"]]
-        self.assertIn((-21.5, -68.5), centros)
+        self.assertIn((35.5, 140.5), centros)
 
     def test_previsao_por_ponto_e_fora_da_regiao(self):
         self.cliente.post("/api/modelos/", {"algoritmo": "arvore_decisao"}, format="json")
-        ponto = self.cliente.get("/api/previsoes/?latitude=-21.3&longitude=-68.2").json()
+        ponto = self.cliente.get("/api/previsoes/?latitude=35.3&longitude=140.2").json()
         self.assertEqual(ponto["total_celulas"], 1)
-        self.assertEqual(self.cliente.get("/api/previsoes/?latitude=10&longitude=-70").status_code, 400)
+        self.assertEqual(self.cliente.get("/api/previsoes/?latitude=95&longitude=-70").status_code, 400)
 
     def test_sem_modelo_404(self):
         self.assertEqual(self.cliente.get("/api/previsoes/").status_code, 404)
@@ -241,11 +241,11 @@ class MlTests(TestCase):
 
     @mock.patch("api.services.usgs.buscar_terremotos")
     def test_retreino_atualiza_dados_com_6_anos(self, buscar):
-        buscar.return_value = [feature_usgs("novo", mag=5.5, lat=-21.4, lon=-68.3)]
+        buscar.return_value = [feature_usgs("novo", mag=5.5, lat=35.4, lon=140.3)]
         resposta = self.cliente.post("/api/modelos/", {"algoritmo": "arvore_decisao",
                                                        "atualizar_dados": True}, format="json")
         self.assertEqual(resposta.status_code, 201)
-        buscar.assert_called_once_with(6, None)
+        buscar.assert_called_once_with(6, 2.5)
         self.assertTrue(Terremoto.objects.filter(usgs_id="novo").exists())
 
     def test_apagar_modelo_remove_arquivo(self):
