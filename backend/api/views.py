@@ -9,12 +9,14 @@ from django.shortcuts import get_object_or_404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from .filters import TerremotoFilter
 from .models import Coleta, ModeloTreinado, Terremoto
 from .serializers import (ColetaSerializer, ModeloTreinadoSerializer,
-                          PrevisaoQuerySerializer, TerremotoSerializer, TreinoSerializer)
+                          PrevisaoQuerySerializer, TerremotoSerializer, TreinoSerializer,
+                          UploadCsvSerializer)
 from .services import estatisticas, importacao, ml
 from .services.usgs import ErroUSGS
 
@@ -88,6 +90,29 @@ class ColetaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
             coleta = erro.coleta
             return Response(self.get_serializer(coleta).data, status=status.HTTP_502_BAD_GATEWAY)
         return Response(self.get_serializer(coleta).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="upload",
+            parser_classes=[MultiPartParser, FormParser], serializer_class=UploadCsvSerializer)
+    def upload(self, request):
+        """
+        Importa um CSV enviado pelo usuário (multipart/form-data).
+
+        Campos: arquivo (CSV com as colunas do USGS) e magnitude_minima (opcional).
+        Eventos já existentes são atualizados pelo id, não duplicados.
+        """
+        entrada = UploadCsvSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        arquivo = entrada.validated_data["arquivo"]
+        try:
+            coleta = importacao.importar_csv(
+                arquivo, magnitude_minima=entrada.validated_data["magnitude_minima"],
+                nome=arquivo.name,
+            )
+        except ValueError as erro:
+            # Arquivo com formato ou colunas inválidas: o erro é do cliente, 400.
+            # A coleta fica registrada com status "erro" e a mensagem.
+            return Response(ColetaSerializer(erro.coleta).data, status=status.HTTP_400_BAD_REQUEST)
+        return Response(ColetaSerializer(coleta).data, status=status.HTTP_201_CREATED)
 
 
 class ModeloViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
