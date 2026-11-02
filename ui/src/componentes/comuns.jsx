@@ -24,6 +24,28 @@ export function Cartao({ titulo, subtitulo, controles, largo = false, children }
   )
 }
 
+// Texto fixo sob um gráfico: a conclusão que ele permite tirar
+export function Conclusao({ children }) {
+  return (
+    <p className="conclusao">
+      <strong>O que isso mostra:</strong> {children}
+    </p>
+  )
+}
+
+// Título de uma etapa da análise, com a pergunta que ela responde
+export function Etapa({ numero, titulo, pergunta }) {
+  return (
+    <div className="etapa">
+      <span className="numero">{numero}</span>
+      <div>
+        <h2>{titulo}</h2>
+        <p>{pergunta}</p>
+      </div>
+    </div>
+  )
+}
+
 export function Metrica({ rotulo, valor, detalhe }) {
   return (
     <div className="metrica">

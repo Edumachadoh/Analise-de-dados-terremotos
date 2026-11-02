@@ -139,7 +139,6 @@ select {
 .conteudo {
   padding: 28px 32px 48px;
   min-width: 0;
-  max-width: 1400px;
 }
 
 .cabecalho {
@@ -160,7 +159,7 @@ select {
 
 .grade-cartoes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -660,6 +659,12 @@ td.num {
 
 /* ------------------------------------------------------------ telas menores */
 
+@media (max-width: 1200px) {
+  .grade-cartoes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 900px) {
   .app {
     grid-template-columns: 1fr;
@@ -675,4 +680,55 @@ td.num {
   .modelos {
     grid-template-columns: 1fr;
   }
+}
+
+/* ------------------------------------------------------------ análise guiada do Painel */
+
+.etapa {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.etapa .numero {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  background: var(--serie-1);
+  color: #fff;
+}
+
+.etapa h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.etapa p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--texto-2);
+}
+
+.conclusao {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--serie-1);
+  background: var(--superficie-2);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--texto);
+}
+
+.ponte-ml {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.7;
 }

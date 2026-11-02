@@ -19,13 +19,15 @@ function DicaRecharts({ active, payload, montar }) {
 }
 
 // dados: [{ nome, valor }]
-export function Barras({ dados, rotuloValor = 'Terremotos', formatar = formatarInteiro, altura = 280 }) {
+// `log`: eixo vertical em escala logarítmica (cada marca vale 10 vezes a anterior)
+export function Barras({ dados, rotuloValor = 'Terremotos', formatar = formatarInteiro, altura = 280, log = false }) {
   return (
     <ResponsiveContainer width="100%" height={altura}>
       <BarChart data={dados} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="var(--grade)" vertical={false} />
         <XAxis dataKey="nome" {...EIXO} interval={0} />
-        <YAxis {...EIXO} axisLine={false} width={48} tickFormatter={formatar} />
+        <YAxis {...EIXO} axisLine={false} width={48} tickFormatter={formatar}
+          {...(log ? { scale: 'log', domain: [1, 'auto'], allowDataOverflow: true } : {})} />
         <Tooltip cursor={CURSOR} content={<DicaRecharts montar={(d) => ({ titulo: d.nome, linhas: [[rotuloValor, formatar(d.valor)]] })} />} />
         <Bar dataKey="valor" fill="var(--serie-1)" radius={[4, 4, 0, 0]} maxBarSize={64} isAnimationActive={false} />
       </BarChart>
