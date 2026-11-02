@@ -291,7 +291,7 @@ export async function importarDoUsgs(anos, magnitudeMinima) {
 }
 
 // ------------------------------------------------------------------ envio de arquivo
-// A rota POST /api/coletas/arquivo/ ainda não existe no back; este é o contrato proposto (veja ui/README.md).
+// A rota POST /api/coletas/arquivo/ ainda não existe no back; este é o contrato proposto (veja a seção "Upload de arquivos" do readme.md).
 function registrosDoArquivo(nome, texto) {
   const extensao = nome.split('.').pop().toLowerCase()
   try {

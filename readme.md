@@ -11,7 +11,7 @@ O projeto tem duas partes que conversam **somente por uma API REST**:
 │   ├── api/, config/         #   a API: modelos, rotas, serviços de USGS, estatísticas e machine learning
 │   ├── data/                 #   CSV de exemplo para o upload e casos de teste do upload
 │   └── scripts/              #   arquivos vazios, não implementados
-├── ui/                       # interface web (React + Vite)
+├── ui/                       # interface web (React + Vite): veja a seção Front-end abaixo
 └── readme.md
 ```
 
@@ -25,12 +25,14 @@ O projeto tem duas partes que conversam **somente por uma API REST**:
 1. [Como rodar o projeto](#como-rodar-o-projeto)
 2. [Comandos da base de dados](#comandos-da-base-de-dados)
 3. [Endpoints da API](#endpoints-da-api)
-4. [Dados na API](#dados-na-api)
-5. [Arquivos da API](#arquivos-da-api)
-6. [Fluxo de uma requisição](#fluxo-de-uma-requisição)
-7. [Testes](#testes)
-8. [Dados utilizados](#dados-utilizados)
-9. [Limitações dos dados](#limitações-dos-dados)
+4. [Front-end (interface)](#front-end-interface)
+5. [Upload de arquivos: como se comporta](#upload-de-arquivos-como-se-comporta)
+6. [Dados na API](#dados-na-api)
+7. [Arquivos da API](#arquivos-da-api)
+8. [Fluxo de uma requisição](#fluxo-de-uma-requisição)
+9. [Testes](#testes)
+10. [Dados utilizados](#dados-utilizados)
+11. [Limitações dos dados](#limitações-dos-dados)
 
 ---
 
@@ -208,7 +210,7 @@ curl -F "arquivo=@data/terremotos_global_m2.5_6a3anos.csv" http://127.0.0.1:8000
 python manage.py importar_terremotos --arquivo data/terremotos_global_m2.5_6a3anos.csv
 ```
 
-O CSV precisa ter as colunas do USGS. São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth`; as demais são opcionais. A coluna `time` pode vir em milissegundos (como na API do USGS) ou como data ISO (como nos CSVs gerados pelo `baixar_csv` e no CSV baixado do site do USGS). Linhas inválidas, de outro tipo de evento (`type` diferente de `earthquake`) ou abaixo da magnitude mínima (padrão 2,5) são descartadas, e a quantidade aparece na `mensagem` da coleta.
+O arquivo (CSV, JSON ou XML) precisa ter as colunas do USGS. São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth`; as demais são opcionais. A coluna `time` pode vir em milissegundos (como na API do USGS) ou como data ISO (como nos CSVs gerados pelo `baixar_csv` e no CSV baixado do site do USGS). Linhas inválidas, de outro tipo de evento (`type` diferente de `earthquake`) ou abaixo da magnitude mínima (padrão 2,5) são descartadas, e a quantidade aparece na `mensagem` da coleta.
 
 ### Exemplo: montar uma base de 6 anos
 
@@ -320,11 +322,11 @@ GET /api/terremotos/?local=japan&data_inicio=2025-01-01&data_fim=2025-12-31&orde
 {"anos": 3, "magnitude_minima": 2.5}
 ```
 
-**`POST /api/coletas/upload/`**: envia um CSV, em `multipart/form-data`:
+**`POST /api/coletas/upload/`**: envia um arquivo `.csv`, `.json` (inclusive GeoJSON) ou `.xml`, em `multipart/form-data`:
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
-| `arquivo` | sim | `.csv` com as colunas do USGS, até 50 MB |
+| `arquivo` | sim | `.csv`, `.json` ou `.xml` com as colunas do USGS, até 50 MB |
 | `magnitude_minima` | não | padrão 2,5 |
 
 As duas respondem com o registro da coleta:
@@ -394,6 +396,121 @@ GET /api/previsoes/?latitude=35.7&longitude=139.7     # a célula de Tóquio
 ```
 
 Cada célula da resposta traz os limites de latitude e longitude, o centro, a `probabilidade`, os eventos dos últimos 12 períodos e a taxa histórica. Status: 404 quando ainda não há modelo treinado, 400 para parâmetros inválidos.
+
+---
+
+## Front-end (interface)
+
+Interface em React + Vite, na pasta `ui/`. Para rodar, veja [Como rodar o projeto](#como-rodar-o-projeto).
+
+### Telas
+
+| Tela | O que mostra |
+|---|---|
+| **Painel** | totais, terremotos por mês, por faixa de magnitude e de profundidade, magnitude máxima por mês e dispersão profundidade × magnitude |
+| **Mapa** | epicentros no mapa, com cor e tamanho pela coluna escolhida (padrão: magnitude) |
+| **Dados** | tabela paginada e ordenável, histórico de importações, busca de dados novos no USGS e envio de arquivo |
+| **Modelos** | treinar um algoritmo escolhendo os parâmetros, ver as métricas contra o baseline e a importância das informações, ativar ou excluir modelos |
+| **Previsões** | probabilidade de terremoto por região nos próximos 30 dias, em mapa e em tabela |
+
+Os **filtros** da barra lateral (magnitude, profundidade, período, escala, tsunami, alerta e local) valem para
+Painel, Mapa e Dados ao mesmo tempo.
+
+Só o **nome das colunas** é traduzido para a tela, em [`ui/src/lib/rotulos.js`](ui/src/lib/rotulos.js); os valores aparecem
+como vêm da API (`mb`, `raso`, `reviewed`…).
+
+> No menu lateral só aparecem Painel, Mapa e Dados. As telas **Modelos** e **Previsões** existem em `ui/src/paginas/`, mas estão desativadas em `ui/src/App.jsx` (comentadas).
+
+### De onde vêm os dados
+
+A escolha da fonte fica em [`ui/src/api/index.js`](ui/src/api/index.js); as telas só chamam `api.…` e não sabem qual está ativa.
+
+| `VITE_FONTE` | De onde vêm os dados | Onde está o código |
+|---|---|---|
+| `usgs` (padrão do `.env.example`) | API do USGS, chamada direto do navegador | `ui/src/api/usgs/` |
+| `back` | API REST do back (Django) | `ui/src/api/cliente.js` |
+
+Na fonte `usgs`, só os **terremotos** vêm do USGS (`ui/src/api/usgs/servico.js`, com a mesma consulta do back: recorte do
+Chile, janelas de 1 ano, contagem antes de baixar e novas tentativas). Todo o resto é calculado no navegador, com os mesmos
+nomes de campo, formatos de resposta, validações e mensagens de erro do back: filtros, ordenação, paginação de 50 em 50,
+estatísticas, histórico de importações, modelos e previsões. O botão **Buscar no USGS** da tela Dados também é de verdade:
+baixa os anos pedidos e soma à base, sem duplicar.
+
+Diferenças em relação ao back:
+
+- **Modelos.** Todos os algoritmos treinam o mesmo modelo simples, uma regressão logística escrita em JavaScript, que usa o
+  mesmo painel de células e períodos do back e o mesmo baseline. As métricas são reais desse modelo, não do algoritmo escolhido.
+  A tela Modelos avisa isso. Os números de cada algoritmo só virão com o back.
+- **Sem internet ou USGS fora do ar:** as telas mostram a mensagem de erro e tentam de novo ao trocar de tela.
+- **Nada é salvo:** modelos e importações vivem na memória da página.
+
+Se o back mudar uma rota ou um formato, atualize também `ui/src/api/usgs/` para as duas fontes continuarem iguais.
+
+### Estrutura do front-end
+
+```
+ui/src/
+├── api/
+│   ├── index.js              # escolhe a fonte dos dados (VITE_FONTE)
+│   ├── cliente.js            # chamadas HTTP ao back
+│   ├── erro.js               # ErroApi, usado pelas duas fontes
+│   └── usgs/                 # fonte USGS: servico.js (API do USGS), dados.js (terremotos, estatísticas, coletas), ml.js (modelos, previsões)
+├── componentes/              # cartões, filtros, gráficos (Recharts), mapa base (Leaflet)
+├── lib/
+│   ├── rotulos.js            # tradução dos nomes das colunas
+│   ├── formato.js            # números e datas em português
+│   ├── useCarregar.js        # busca na API com estado de carregamento e erro
+│   └── useTodosTerremotos.js # junta as páginas de terremotos, com progresso e cache
+├── paginas/                  # Painel, Mapa, Dados, Modelos, Previsoes
+└── App.jsx                   # navegação e filtros compartilhados
+```
+
+Bibliotecas: [React](https://react.dev) + [Vite](https://vite.dev), [Recharts](https://recharts.org) (gráficos),
+[React Leaflet](https://react-leaflet.js.org) (mapa, com fundo do OpenStreetMap) e
+[Papa Parse](https://www.papaparse.com) (leitura de CSV no envio de arquivo).
+
+---
+
+## Upload de arquivos: como se comporta
+
+Na tela **Dados → Enviar um arquivo** (clique ou arraste), o front chama `POST /api/coletas/upload/`
+(multipart, campo `arquivo`). O back lê **`.csv`, `.json` (inclusive GeoJSON) e `.xml`, até 50 MB**. Os terremotos do arquivo são **somados** à base: o `id` do USGS
+identifica cada evento, então reenviar o mesmo evento o atualiza em vez de duplicar. Os casos de teste, com os arquivos
+prontos, estão em [`backend/data/testes_upload/LEIAME.md`](backend/data/testes_upload/LEIAME.md).
+
+**Colunas.** São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth` (os nomes do USGS, em minúsculas).
+Colunas a mais são ignoradas. `time` pode ser milissegundos ou data ISO. O CSV precisa ser UTF-8 e separado por vírgula.
+
+**Formatos aceitos** (cada um vale também para o comando `importar_terremotos --arquivo`):
+- **CSV:** uma linha por terremoto, com cabeçalho.
+- **JSON:** uma lista de registros (`[{"id": ..., "mag": ...}]`), um objeto com a lista dentro de algum campo, ou o GeoJSON do USGS (`{"features": [...]}`), de onde saem o `id`, as `properties` e as coordenadas (longitude, latitude, profundidade).
+- **XML:** um elemento por terremoto, com as colunas como elementos filhos (`<evento><id>..</id><mag>..</mag>...</evento>`).
+
+**Magnitude mínima.** O front não envia `magnitude_minima`, então vale o padrão do back (2,5): terremotos abaixo disso são
+descartados.
+
+| O que acontece | Resposta do back | O que a tela mostra |
+|---|---|---|
+| Arquivo válido | 201 | Aviso verde: "Importação concluída: X recebidos, Y novos e Z atualizados." |
+| Reenvio de eventos que já existem | 201 | Os eventos contam como "atualizados"; nada é duplicado |
+| Colunas extras no arquivo | 201 | Aceito; as colunas extras são ignoradas |
+| Algumas linhas inválidas (latitude fora da faixa, magnitude vazia ou com texto, data inválida, tipo diferente de terremoto, magnitude abaixo da mínima, id repetido no arquivo) | 201 | Importa as linhas boas e descarta as ruins. Aviso verde com as contagens, e a quantidade descartada aparece na coluna **Mensagem** do histórico |
+| Só o cabeçalho, sem linhas | 201 | "0 recebidos, 0 novos e 0 atualizados" |
+| **Coluna obrigatória faltando** ou com nome errado (ex.: `latitud`) | 400, com a coleta registrada como `erro` | Aviso vermelho: "Colunas ausentes no CSV: ['mag']" (ou "no JSON" / "no XML"; lista todas as que faltam). A importação aparece no histórico com situação `erro` |
+| Separador `;` (padrão do Excel em português) | 400, coleta `erro` | Aviso vermelho de colunas ausentes (o back não reconhece o separador) |
+| Texto que não é um CSV de terremotos | 400, coleta `erro` | Aviso vermelho de colunas ausentes |
+| Arquivo em Latin-1 (não UTF-8) | 400, coleta `erro` | Aviso vermelho: "Não foi possível ler o CSV…" |
+| JSON ou XML malformado (chave sem fechar, tag sem fechar) | 400, coleta `erro` | Aviso vermelho: "Não foi possível ler o JSON…" (ou "XML") |
+| Arquivo vazio (0 bytes) | 400, sem registrar coleta | Aviso vermelho: "arquivo: O arquivo submetido está vázio." |
+| Extensão que não é `.csv`, `.json` ou `.xml` (ex.: `.txt`) | 400, sem registrar coleta | Aviso vermelho: "arquivo: Formato .txt não aceito. Envie: .csv, .json, .xml." |
+| Arquivo maior que 50 MB | 400, sem registrar coleta | Aviso vermelho: "arquivo: Arquivo maior que 50 MB." |
+| Back desligado | sem resposta | "Não foi possível conectar à API. O back-end está rodando (python manage.py runserver)?" |
+
+Quando o erro acontece **depois** de o arquivo ser lido (colunas ausentes, encoding), o back guarda a tentativa no histórico de
+importações com `status: erro`; quando a validação barra **antes** (extensão, tamanho, arquivo vazio), nada é registrado.
+O front mostra, nos dois casos, só o texto do erro (veja `mensagemDeErro` em `ui/src/api/cliente.js`).
+
+Com a fonte `usgs` (sem back), o envio roda no navegador e aceita os mesmos três formatos.
 
 ---
 
@@ -579,13 +696,13 @@ São **31 testes**, em cinco grupos:
 
 ### Testes manuais do upload
 
-A pasta `backend/data/testes_upload/` tem 18 arquivos para testar o `POST /api/coletas/upload/` à mão, com a API rodando. O resultado esperado de cada um está em [`data/testes_upload/LEIAME.md`](backend/data/testes_upload/LEIAME.md).
+A pasta `backend/data/testes_upload/` tem 21 arquivos para testar o `POST /api/coletas/upload/` à mão, com a API rodando. O resultado esperado de cada um está em [`data/testes_upload/LEIAME.md`](backend/data/testes_upload/LEIAME.md).
 
 | Grupo | Arquivos | Resultado |
 |---|---|---|
-| Aceitos | `01` a `06` | 201: válido, `time` em data ISO, reenvio que atualiza, colunas extras ignoradas, só as colunas obrigatórias, extensão `.CSV` |
+| Aceitos | `01` a `06`, `19` a `21` | 201: válido, `time` em data ISO, reenvio que atualiza, colunas extras ignoradas, só as colunas obrigatórias, extensão `.CSV`, JSON em lista, GeoJSON e XML |
 | Aceitos com linhas descartadas | `07` a `09` | 201 com aviso na `mensagem`: linhas inválidas, ids duplicados, arquivo só com cabeçalho |
-| Rejeitados | `10` a `18` | 400: coluna faltando, nome de coluna errado, separador `;`, encoding Latin-1, arquivo vazio, texto qualquer, `.json`, `.txt` |
+| Rejeitados | `10` a `18` | 400: coluna faltando, nome de coluna errado, separador `;`, encoding Latin-1, arquivo vazio, texto qualquer, JSON sem as colunas obrigatórias, `.txt` |
 
 **Diferente dos automatizados, estes testes gravam no banco real** quando enviados à API em execução. Os terremotos de teste têm o id começando com `teste_`, para serem fáceis de remover:
 
