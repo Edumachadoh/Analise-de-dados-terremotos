@@ -9,6 +9,8 @@ import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
 const TAMANHO_PAGINA = 50 // o mesmo PAGE_SIZE do back
+// O back (rota /coletas/upload/) lê só CSV; a fonte USGS, que roda no navegador, lê os três formatos
+const FORMATOS_ACEITOS = api.local ? '.csv,.json,.xml' : '.csv'
 
 // Colunas da tabela. `ordena` é o campo aceito em ?ordering= (o back só ordena por estes três).
 const COLUNAS = [
@@ -159,7 +161,7 @@ function Importacao({ aoImportar }) {
 
   return (
     <div className="grade-cartoes">
-      <Cartao titulo="Buscar dados no USGS" subtitulo="Baixa os terremotos do Chile dos últimos anos; os que já existem são atualizados, não duplicados">
+      <Cartao titulo="Buscar dados no USGS" subtitulo="Baixa os terremotos do mundo inteiro dos últimos anos; os que já existem são atualizados, não duplicados">
         <div className="formulario-linha">
           <label className="campo">
             Últimos (anos)
@@ -177,7 +179,7 @@ function Importacao({ aoImportar }) {
         {ocupado?.startsWith('Buscando') && <p className="texto-explicacao">{ocupado}</p>}
       </Cartao>
 
-      <Cartao titulo="Enviar um arquivo" subtitulo="CSV, JSON (inclusive GeoJSON) ou XML com as colunas do USGS: id, mag, time, latitude, longitude e depth">
+      <Cartao titulo="Enviar um arquivo" subtitulo={`${api.local ? 'CSV, JSON (inclusive GeoJSON) ou XML' : 'CSV'} com as colunas do USGS: id, mag, time, latitude, longitude e depth`}>
         <div
           className={`upload${arrastando ? ' arrastando' : ''}`}
           onClick={() => entrada.current.click()}
@@ -198,7 +200,7 @@ function Importacao({ aoImportar }) {
           <Icone nome="upload" tamanho={26} />
           <strong>{ocupado?.startsWith('Enviando') ? ocupado : 'Arraste um arquivo aqui ou clique para escolher'}</strong>
           <span>Os terremotos do arquivo são somados à base</span>
-          <input ref={entrada} type="file" accept=".csv,.json,.xml" hidden
+          <input ref={entrada} type="file" accept={FORMATOS_ACEITOS} hidden
             onChange={(e) => {
               enviar(e.target.files[0])
               e.target.value = ''

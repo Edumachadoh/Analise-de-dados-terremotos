@@ -515,6 +515,55 @@ td.num {
   border: 1px solid var(--borda);
 }
 
+/* Mapa que cabe na tela sem rolar: desconta cabeçalho, título do cartão e legenda */
+.mapa.ocupa-tela {
+  height: max(360px, calc(100vh - 340px));
+}
+
+/* Aviso fixo abaixo do mapa quando só uma amostra dos pontos é desenhada */
+.nota-mapa {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  background: var(--alerta-fundo);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--texto);
+}
+
+/* ------------------------------------------------------------ matriz de correlação */
+
+.matriz-correlacao {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.matriz-correlacao .cabeca {
+  color: var(--texto-2);
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+}
+
+.matriz-correlacao .cabeca.coluna {
+  justify-content: center;
+  text-align: center;
+  font-size: 12px;
+}
+
+.matriz-correlacao .celula {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--texto);
+}
+
 /* ------------------------------------------------------------ modelos */
 
 .modelos {

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api, consulta } from '../api/index.js'
 
-// O back entrega 50 terremotos por página. Para o mapa e a dispersão é preciso juntar todas as
-// páginas, o que leva alguns segundos. Por isso o resultado fica em memória (compartilhado entre
+// Para o mapa e a dispersão é preciso juntar todos os terremotos. Com o back, cada página traz
+// até 5.000 (?page_size=); sem ele, a fonte USGS devolve 50 por página. Por isso o resultado fica em memória (compartilhado entre
 // as telas) e os pontos aparecem aos poucos, enquanto as páginas chegam.
 const PAGINAS_EM_PARALELO = 6
+const TAMANHO_PAGINA = 5000
 const cache = new Map() // chave dos filtros → { itens, total, completo, erro, ouvintes }
 
 export const esquecerTerremotos = () => cache.clear()
@@ -14,14 +15,14 @@ function iniciar(filtros) {
   const avisar = () => entrada.ouvintes.forEach((f) => f())
 
   ;(async () => {
-    const primeira = await api.listarTerremotos(filtros, 1)
+    const primeira = await api.listarTerremotos(filtros, 1, '-data_hora', TAMANHO_PAGINA)
     entrada.itens = [...primeira.results]
     entrada.total = primeira.count
     avisar()
     const paginas = Math.ceil(primeira.count / (primeira.results.length || 1))
     for (let inicio = 2; inicio <= paginas; inicio += PAGINAS_EM_PARALELO) {
       const lote = []
-      for (let p = inicio; p < inicio + PAGINAS_EM_PARALELO && p <= paginas; p++) lote.push(api.listarTerremotos(filtros, p))
+      for (let p = inicio; p < inicio + PAGINAS_EM_PARALELO && p <= paginas; p++) lote.push(api.listarTerremotos(filtros, p, '-data_hora', TAMANHO_PAGINA))
       for (const pagina of await Promise.all(lote)) entrada.itens = entrada.itens.concat(pagina.results)
       avisar()
     }

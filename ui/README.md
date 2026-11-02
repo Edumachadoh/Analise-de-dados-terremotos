@@ -101,15 +101,8 @@ Se o back mudar uma rota ou um formato, atualize também `src/api/usgs/` para as
 
 ## O que o back ainda não tem
 
-- **Envio de arquivo.** A tela Dados já tem o campo e a fonte `usgs` já aceita CSV, JSON (inclusive GeoJSON) e XML, mas a
-  rota **não existe no back**. Contrato que o front espera:
-  `POST /api/coletas/arquivo/`, corpo `multipart/form-data` com o campo `arquivo`, resposta `201` com a coleta
-  (`id`, `origem`, `status`, `recebidos`, `novos`, `atualizados`…) e, em arquivo inválido, `400` com `{"detail": "mensagem"}`.
-  Colunas obrigatórias: `id`, `mag`, `time`, `latitude`, `longitude`, `depth`. Com `VITE_FONTE=back`, a tela mostra uma
-  mensagem explicando que a rota falta. O código para ler os três formatos está em `backend/scripts/preparo.py`.
-- **Tamanho de página configurável.** O back entrega 50 terremotos por página. O mapa e a dispersão precisam de todos,
-  então, com `VITE_FONTE=back`, o front baixa as 51 páginas (cerca de 3 a 5 segundos) e guarda o resultado em memória.
-  Se o back aceitasse `?page_size=` (`page_size_query_param` na classe de paginação), isso cairia para uma requisição.
+- **Envio de arquivo.** Já existe: `POST /api/coletas/upload/` (multipart, campo `arquivo`; só CSV, até 50 MB), com as colunas do USGS (`id`, `mag`, `time`, `latitude`, `longitude`, `depth`). Arquivo inválido volta `400` com o registro da coleta (o front mostra o campo `mensagem`) ou com `{"campo": ["erro"]}`. Com a fonte `usgs`, o front também lê JSON e XML.
+- **Tamanho de página.** `?page_size=` já é aceito (até 5.000); o mapa e a dispersão baixam tudo em uma requisição.
 - **Previsões lentas.** `GET /api/previsoes/` leva uns 3 segundos com limite e uns 5 sem, porque o back remonta o painel
   de células a cada chamada. Por isso a tela abre com as 50 regiões mais prováveis.
 - **Tamanho da região no treino.** `tamanho_celula` só aceita os **textos** `"0.5"`, `"1.0"` e `"2.0"`. Enviar o número `1`
