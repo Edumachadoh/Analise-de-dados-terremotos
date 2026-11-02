@@ -29,7 +29,11 @@ class Command(BaseCommand):
         try:
             if opcoes["arquivo"]:
                 self.stdout.write(f"Importando {opcoes['arquivo']}...")
-                coleta = importacao.importar_csv(opcoes["arquivo"], anos=opcoes["anos"])
+                magnitude = opcoes["magnitude_minima"]
+                if magnitude is None:
+                    magnitude = settings.MAGNITUDE_MINIMA_COLETA
+                coleta = importacao.importar_csv(opcoes["arquivo"], anos=opcoes["anos"],
+                                                 magnitude_minima=magnitude)
             else:
                 self.stdout.write(f"Buscando no USGS os últimos {opcoes['anos']} anos...")
                 coleta = importacao.importar_do_usgs(opcoes["anos"], opcoes["magnitude_minima"])

@@ -2,6 +2,8 @@
 Serializers: convertem objetos em JSON (saída) e validam o JSON recebido (entrada).
 """
 
+from pathlib import Path
+
 from django.conf import settings
 from rest_framework import serializers
 
@@ -37,6 +39,34 @@ class ColetaSerializer(serializers.ModelSerializer):
 
     def validate(self, dados):
         dados.setdefault("anos", settings.ANOS_COLETA_PADRAO)
+        return dados
+
+
+class UploadCsvSerializer(serializers.Serializer):
+    """
+    Entrada do upload (POST /api/coletas/upload/, multipart/form-data).
+    O CSV deve ter as colunas do USGS, as mesmas dos arquivos em data/raw/.
+    """
+    arquivo = serializers.FileField(help_text="CSV com as colunas do USGS")
+    magnitude_minima = serializers.FloatField(
+        required=False, allow_null=True, min_value=-2, max_value=10,
+        help_text=f"Padrão: {settings.MAGNITUDE_MINIMA_COLETA}, a mesma da coleta do USGS",
+    )
+
+    def validate_arquivo(self, arquivo):
+        extensao = Path(arquivo.name).suffix.lower()
+        if extensao not in settings.UPLOAD_EXTENSOES:
+            raise serializers.ValidationError(
+                f"Formato {extensao or 'sem extensão'} não aceito. Envie: "
+                f"{', '.join(settings.UPLOAD_EXTENSOES)}.")
+        if arquivo.size > settings.UPLOAD_TAMANHO_MAXIMO_MB * 1024 * 1024:
+            raise serializers.ValidationError(
+                f"Arquivo maior que {settings.UPLOAD_TAMANHO_MAXIMO_MB} MB.")
+        return arquivo
+
+    def validate(self, dados):
+        if dados.get("magnitude_minima") is None:
+            dados["magnitude_minima"] = settings.MAGNITUDE_MINIMA_COLETA
         return dados
 
 

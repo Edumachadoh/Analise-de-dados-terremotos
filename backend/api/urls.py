@@ -5,6 +5,7 @@ navegável em /api/, que lista os endpoints.
     /api/terremotos/                    CRUD + filtros
     /api/estatisticas/                  resumo (e /por-mes/, /por-magnitude/, /por-profundidade/)
     /api/coletas/                       histórico e nova importação do USGS
+    /api/coletas/upload/                importação de um CSV enviado (multipart)
     /api/modelos/                       modelos treinados; POST treina
     /api/modelos/algoritmos/            algoritmos e parâmetros disponíveis
     /api/modelos/{id}/ativar/           escolhe o modelo das previsões

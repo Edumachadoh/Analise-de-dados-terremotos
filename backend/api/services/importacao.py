@@ -28,6 +28,9 @@ CAMPOS_ATUALIZAVEIS = [
 
 LOTE_CONSULTA = 10_000  # ids por consulta ao verificar quais eventos já existem
 
+# Colunas que um CSV precisa ter para ser importado (nomes do USGS)
+COLUNAS_OBRIGATORIAS = {"id", "mag", "time", "latitude", "longitude", "depth"}
+
 
 # -----------------------------------------------------------------------------
 # Conversão
@@ -49,6 +52,26 @@ def _data_ms(valor):
 
 def _texto(valor) -> str:
     return "" if _vazio(valor) else str(valor)
+
+
+def tempo_em_ms(serie: pd.Series) -> pd.Series:
+    """
+    Converte uma coluna de tempo para milissegundos desde 1970 (UTC).
+    Aceita os dois formatos: milissegundos (como vem da API do USGS) ou data
+    ISO (ex.: "2024-04-29 14:11:19.731000", como no banco). Data sem fuso é UTC.
+    Valores que não são nenhum dos dois viram NaN.
+    """
+    numerico = pd.to_numeric(serie, errors="coerce")
+    texto = serie.where(numerico.isna() & serie.notna())
+    datas = pd.to_datetime(texto, utc=True, errors="coerce", format="ISO8601")
+    ms = (datas - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(milliseconds=1)
+    return numerico.fillna(ms)
+
+
+def ms_em_texto(valor) -> str:
+    """Milissegundos desde 1970 -> data ISO em UTC, no formato do banco."""
+    data = _data_ms(valor)
+    return "" if data is None else data.replace(tzinfo=None).isoformat(sep=" ", timespec="microseconds")
 
 
 def terremoto_de_registro(reg: dict) -> Terremoto:
@@ -146,24 +169,63 @@ def importar_do_usgs(anos: int, magnitude_minima: float | None = None) -> Coleta
     """
     if magnitude_minima is None:
         magnitude_minima = settings.MAGNITUDE_MINIMA_COLETA
-    coleta =Coleta.objects.create(anos=anos, magnitude_minima=magnitude_minima)
+    coleta = Coleta.objects.create(anos=anos, magnitude_minima=magnitude_minima)
     return _executar(
         coleta,
         lambda: [registro_de_feature(f) for f in usgs.buscar_terremotos(anos, magnitude_minima)],
     )
 
 
-def importar_csv(caminho, anos: int = 0) -> Coleta:
+def ler_csv(arquivo, magnitude_minima: float | None = None) -> tuple[list[dict], int]:
     """
-    Importa o CSV gerado pela coleta do projeto (mesmas colunas do USGS).
-    Útil para carregar a base sem depender da API.
-    """
-    def ler():
-        df = pd.read_csv(caminho)
-        faltando = {"id", "mag", "time", "latitude", "longitude", "depth"} - set(df.columns)
-        if faltando:
-            raise ValueError(f"Colunas ausentes no CSV: {sorted(faltando)}")
-        return df.to_dict("records")
+    Lê um CSV com as colunas do USGS (as mesmas de data/raw/) e devolve
+    (registros válidos, quantidade de linhas descartadas).
 
-    coleta = Coleta.objects.create(anos=max(anos, 1), origem=Path(caminho).name[:20])
+    Descarta as linhas sem os campos obrigatórios, com coordenadas fora da faixa
+    ou abaixo da magnitude mínima. Erros de formato viram ValueError.
+    """
+    try:
+        df = pd.read_csv(arquivo)
+    except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as erro:
+        raise ValueError(f"Não foi possível ler o CSV: {erro}") from erro
+
+    faltando = COLUNAS_OBRIGATORIAS - set(df.columns)
+    if faltando:
+        raise ValueError(f"Colunas ausentes no CSV: {sorted(faltando)}")
+
+    total = len(df)
+    df = df.dropna(subset=sorted(COLUNAS_OBRIGATORIAS))
+    for coluna in ("mag", "latitude", "longitude", "depth"):
+        df[coluna] = pd.to_numeric(df[coluna], errors="coerce")
+    df["time"] = tempo_em_ms(df["time"])
+    if "updated" in df.columns:
+        df["updated"] = tempo_em_ms(df["updated"])
+    df = df.dropna(subset=["mag", "time", "latitude", "longitude", "depth"])
+    df = df[df["latitude"].between(-90, 90) & df["longitude"].between(-180, 180)
+            & df["mag"].between(-2, 10)]
+    if "type" in df.columns:
+        df = df[df["type"].fillna("earthquake") == "earthquake"]
+    if magnitude_minima is not None:
+        df = df[df["mag"] >= magnitude_minima]
+    df = df.drop_duplicates(subset="id", keep="last")
+    return df.to_dict("records"), total - len(df)
+
+
+def importar_csv(arquivo, anos: int = 0, magnitude_minima: float | None = None,
+                 nome: str | None = None) -> Coleta:
+    """
+    Importa um CSV com as colunas do USGS. `arquivo` pode ser um caminho
+    (comando importar_terremotos) ou um arquivo enviado pela API (upload).
+    """
+    nome = nome or Path(str(arquivo)).name
+    coleta = Coleta.objects.create(anos=max(anos, 1), magnitude_minima=magnitude_minima,
+                                   origem=nome[:20])
+
+    def ler():
+        registros, descartados = ler_csv(arquivo, magnitude_minima)
+        if descartados:
+            coleta.mensagem = f"{descartados} linha(s) descartada(s) por dados inválidos, " \
+                              "tipo diferente de terremoto ou magnitude abaixo da mínima."
+        return registros
+
     return _executar(coleta, ler)

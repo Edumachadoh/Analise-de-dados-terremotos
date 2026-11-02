@@ -77,13 +77,17 @@ def _baixar_janela(inicio, fim, magnitude_minima) -> list[dict]:
 
 
 def buscar_terremotos(anos: int, magnitude_minima: float | None = None) -> list[dict]:
+    """Baixa os terremotos do mundo inteiro dos últimos `anos`."""
+    fim = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    return buscar_periodo(fim - timedelta(days=365 * anos), fim, magnitude_minima)
+
+
+def buscar_periodo(inicio: datetime, fim: datetime,
+                   magnitude_minima: float | None = None) -> list[dict]:
     """
-    Baixa os terremotos do mundo inteiro dos últimos `anos`, em janelas de um ano.
+    Baixa os terremotos entre `inicio` e `fim` (UTC, sem fuso), em janelas de um ano.
     Devolve a lista de features GeoJSON, sem duplicatas.
     """
-    fim = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
-    inicio = fim - timedelta(days=365 * anos)
-
     features = []
     janela = inicio
     while janela < fim:

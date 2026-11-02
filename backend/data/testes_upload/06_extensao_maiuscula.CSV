@@ -1,0 +1,2 @@
+id,mag,magType,time,updated,place,tsunami,alert,sig,felt,cdi,mmi,nst,gap,dmin,rms,status,net,type,longitude,latitude,depth
+teste_a,4.8,mb,1748736000000,1748736000000,"10 km E of Tokyo, Japan",0,,300,,,,30,50,0.4,0.6,reviewed,us,earthquake,139.7,35.7,10.0
