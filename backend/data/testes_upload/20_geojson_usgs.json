@@ -1,0 +1,41 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "teste_g1",
+   "properties": {
+    "mag": 4.8,
+    "time": 1748736000000,
+    "place": "10 km E of Tokyo, Japan",
+    "type": "earthquake"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.7,
+     35.7,
+     10.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "teste_g2",
+   "properties": {
+    "mag": 5.2,
+    "time": 1748736000000,
+    "place": "20 km W of Santiago, Chile",
+    "type": "earthquake"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -70.6,
+     -33.4,
+     10.0
+    ]
+   }
+  }
+ ]
+}

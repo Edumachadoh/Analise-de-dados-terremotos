@@ -45,9 +45,9 @@ class ColetaSerializer(serializers.ModelSerializer):
 class UploadCsvSerializer(serializers.Serializer):
     """
     Entrada do upload (POST /api/coletas/upload/, multipart/form-data).
-    O CSV deve ter as colunas do USGS, as mesmas dos arquivos em data/raw/.
+    O arquivo (.csv, .json ou .xml) deve ter as colunas do USGS, as mesmas do CSV da coleta.
     """
-    arquivo = serializers.FileField(help_text="CSV com as colunas do USGS")
+    arquivo = serializers.FileField(help_text="Arquivo .csv, .json ou .xml com as colunas do USGS")
     magnitude_minima = serializers.FloatField(
         required=False, allow_null=True, min_value=-2, max_value=10,
         help_text=f"Padrão: {settings.MAGNITUDE_MINIMA_COLETA}, a mesma da coleta do USGS",

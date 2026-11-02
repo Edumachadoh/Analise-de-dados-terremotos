@@ -1,0 +1,20 @@
+[
+ {
+  "id": "teste_j1",
+  "mag": 4.8,
+  "time": 1748736000000,
+  "latitude": 35.7,
+  "longitude": 139.7,
+  "depth": 10.0,
+  "place": "10 km E of Tokyo, Japan"
+ },
+ {
+  "id": "teste_j2",
+  "mag": 5.2,
+  "time": 1748736000000,
+  "latitude": -33.4,
+  "longitude": -70.6,
+  "depth": 10.0,
+  "place": "20 km W of Santiago, Chile"
+ }
+]

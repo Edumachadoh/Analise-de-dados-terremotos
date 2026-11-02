@@ -9,8 +9,7 @@ import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
 const TAMANHO_PAGINA = 50 // o mesmo PAGE_SIZE do back
-// O back (rota /coletas/upload/) lê só CSV; a fonte USGS, que roda no navegador, lê os três formatos
-const FORMATOS_ACEITOS = api.local ? '.csv,.json,.xml' : '.csv'
+const FORMATOS_ACEITOS = '.csv,.json,.xml'
 
 // Colunas da tabela. `ordena` é o campo aceito em ?ordering= (o back só ordena por estes três).
 const COLUNAS = [
@@ -179,7 +178,7 @@ function Importacao({ aoImportar }) {
         {ocupado?.startsWith('Buscando') && <p className="texto-explicacao">{ocupado}</p>}
       </Cartao>
 
-      <Cartao titulo="Enviar um arquivo" subtitulo={`${api.local ? 'CSV, JSON (inclusive GeoJSON) ou XML' : 'CSV'} com as colunas do USGS: id, mag, time, latitude, longitude e depth`}>
+      <Cartao titulo="Enviar um arquivo" subtitulo="CSV, JSON (inclusive GeoJSON) ou XML com as colunas do USGS: id, mag, time, latitude, longitude e depth">
         <div
           className={`upload${arrastando ? ' arrastando' : ''}`}
           onClick={() => entrada.current.click()}

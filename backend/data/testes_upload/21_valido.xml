@@ -1,0 +1,20 @@
+<terremotos>
+  <evento>
+    <id>teste_x1</id>
+    <mag>4.8</mag>
+    <time>1748736000000</time>
+    <latitude>35.7</latitude>
+    <longitude>139.7</longitude>
+    <depth>10.0</depth>
+    <place>10 km E of Tokyo, Japan</place>
+  </evento>
+  <evento>
+    <id>teste_x2</id>
+    <mag>5.2</mag>
+    <time>1748736000000</time>
+    <latitude>-33.4</latitude>
+    <longitude>-70.6</longitude>
+    <depth>10.0</depth>
+    <place>20 km W of Santiago, Chile</place>
+  </evento>
+</terremotos>

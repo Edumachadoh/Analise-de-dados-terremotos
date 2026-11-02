@@ -6,6 +6,7 @@ O USGS é simulado com unittest.mock: os testes não acessam a internet e
 rodam iguais em qualquer computador.
 """
 
+import json
 import shutil
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -244,6 +245,70 @@ class UploadCsvTests(TestCase):
     def test_sem_arquivo_400(self):
         resposta = self.cliente.post("/api/coletas/upload/", {}, format="multipart")
         self.assertEqual(resposta.status_code, 400)
+
+
+class UploadJsonXmlTests(TestCase):
+    """Upload de .json (lista, objeto com lista e GeoJSON) e .xml."""
+
+    def setUp(self):
+        self.cliente = APIClient()
+
+    def enviar(self, nome, conteudo, **campos):
+        arquivo = SimpleUploadedFile(nome, conteudo.encode("utf-8"))
+        return self.cliente.post("/api/coletas/upload/", {"arquivo": arquivo, **campos},
+                                 format="multipart")
+
+    REGISTRO = {"id": "a", "mag": 4.6, "time": 1759276800000, "latitude": 38.2,
+                "longitude": 142.0, "depth": 40.0, "place": "10 km E of Sendai, Japan"}
+
+    def test_json_lista_de_registros(self):
+        resposta = self.enviar("dados.json", json.dumps([self.REGISTRO, {**self.REGISTRO, "id": "b"}]))
+        self.assertEqual(resposta.status_code, 201, resposta.json())
+        self.assertEqual(resposta.json()["novos"], 2)
+        self.assertEqual(Terremoto.objects.get(usgs_id="a").local, "10 km E of Sendai, Japan")
+
+    def test_json_objeto_com_lista_dentro(self):
+        resposta = self.enviar("dados.json", json.dumps({"terremotos": [self.REGISTRO]}))
+        self.assertEqual(resposta.json()["novos"], 1, resposta.json())
+
+    def test_geojson_do_usgs(self):
+        feature = {"type": "Feature", "id": "g1",
+                   "properties": {"mag": 5.1, "time": 1759276800000, "place": "Chile", "type": "earthquake"},
+                   "geometry": {"type": "Point", "coordinates": [-70.6, -33.4, 25.0]}}
+        resposta = self.enviar("dados.geojson.json", json.dumps({"type": "FeatureCollection", "features": [feature]}))
+        self.assertEqual(resposta.status_code, 201, resposta.json())
+        terremoto = Terremoto.objects.get(usgs_id="g1")
+        self.assertEqual((terremoto.latitude, terremoto.longitude, terremoto.profundidade_km),
+                         (-33.4, -70.6, 25.0))
+
+    def test_xml(self):
+        linhas = "".join(
+            "<evento>" + "".join(f"<{k}>{v}</{k}>" for k, v in {**self.REGISTRO, "id": i}.items()) + "</evento>"
+            for i in ("a", "b"))
+        resposta = self.enviar("dados.xml", f"<terremotos>{linhas}</terremotos>")
+        self.assertEqual(resposta.status_code, 201, resposta.json())
+        self.assertEqual(resposta.json()["novos"], 2)
+
+    def test_json_sem_coluna_obrigatoria_400(self):
+        resposta = self.enviar("dados.json", json.dumps([{"id": "a", "mag": 4.0}]))
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn("Colunas ausentes no JSON", resposta.json()["mensagem"])
+
+    def test_xml_sem_coluna_obrigatoria_400(self):
+        resposta = self.enviar("dados.xml", "<t><e><id>a</id><mag>4.0</mag></e></t>")
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn("Colunas ausentes no XML", resposta.json()["mensagem"])
+
+    def test_json_invalido_400(self):
+        resposta = self.enviar("dados.json", "{isto não é json")
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn("Não foi possível ler o JSON", resposta.json()["mensagem"])
+
+    def test_xml_invalido_400(self):
+        resposta = self.enviar("dados.xml", "<abre><sem-fechar>")
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn("Não foi possível ler o XML", resposta.json()["mensagem"])
+        self.assertEqual(Coleta.objects.get().status, Coleta.Status.ERRO)
 
 
 class MlTests(TestCase):

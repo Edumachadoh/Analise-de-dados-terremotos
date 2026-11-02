@@ -169,8 +169,8 @@ REGIAO_ANALISE = (-90.0, 90.0, -180.0, 180.0)
 # 3 anos, a maioria microtremores registrados pela rede densa dos EUA.
 MAGNITUDE_MINIMA_COLETA = 2.5
 
-# Upload de CSV (POST /api/coletas/upload/)
-UPLOAD_EXTENSOES = [".csv"]
+# Upload de arquivo (POST /api/coletas/upload/): .csv, .json (inclusive GeoJSON) ou .xml
+UPLOAD_EXTENSOES = [".csv", ".json", ".xml"]
 UPLOAD_TAMANHO_MAXIMO_MB = 50
 
 # Base padrão: últimos 3 anos. Re-treino: últimos 6 anos.
