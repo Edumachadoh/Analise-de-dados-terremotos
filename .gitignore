@@ -5,3 +5,8 @@ venv/
 # Python
 __pycache__/
 *.py[cod]
+.env
+
+# SQL
+*.sqlite3
+*.sqlite

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Rectangle, Tooltip } from 'react-leaflet'
-import { api } from '../api/cliente.js'
+import { api } from '../api/index.js'
 import { Aviso, Cabecalho, Carregando, Cartao, Metrica, Seletor } from '../componentes/comuns.jsx'
 import { corDaRampa, MapaBase, RAMPA } from '../componentes/MapaBase.jsx'
 import { formatarData, formatarInteiro, formatarNumero, formatarPorcentagem } from '../lib/formato.js'
@@ -30,7 +30,7 @@ export default function Previsoes({ versaoBase }) {
         Probabilidade de cada região do Chile ter um terremoto nos próximos 30 dias, segundo o modelo ativo
       </Cabecalho>
 
-      {semModelo && <Aviso>Ainda não há um modelo treinado. Vá até a tela <strong>Modelos</strong>, treine um e volte aqui.</Aviso>}
+      {semModelo && <Aviso>Não há um modelo ativo. Vá até a tela <strong>Modelos</strong>, treine um novo ou ative um existente e volte aqui.</Aviso>}
       {erro && !semModelo && <Aviso tipo="erro">{erro}</Aviso>}
       {carregando && !dados && !erro && <Carregando texto="Calculando as previsões… (o back leva alguns segundos)" />}
 

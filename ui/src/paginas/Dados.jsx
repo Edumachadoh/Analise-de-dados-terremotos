@@ -2,30 +2,32 @@
 // e importação de dados novos (POST /api/coletas/ busca no USGS; envio de arquivo aguarda o back)
 
 import { useRef, useState } from 'react'
-import { api } from '../api/cliente.js'
+import { api } from '../api/index.js'
 import { Aviso, Cabecalho, Carregando, Cartao, Icone } from '../componentes/comuns.jsx'
 import { formatarData, formatarInteiro, formatarNumero } from '../lib/formato.js'
-import { rotulo, rotuloValor } from '../lib/rotulos.js'
+import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
 const TAMANHO_PAGINA = 50 // o mesmo PAGE_SIZE do back
+// O back (rota /coletas/upload/) lê só CSV; a fonte USGS, que roda no navegador, lê os três formatos
+const FORMATOS_ACEITOS = api.local ? '.csv,.json,.xml' : '.csv'
 
 // Colunas da tabela. `ordena` é o campo aceito em ?ordering= (o back só ordena por estes três).
 const COLUNAS = [
   { campo: 'data_hora', ordena: 'data_hora', formato: (v) => formatarData(v, true) },
   { campo: 'local' },
   { campo: 'magnitude', ordena: 'magnitude', numerico: true, formato: (v) => formatarNumero(v) },
-  { campo: 'tipo_magnitude', formato: (v) => rotuloValor('tipo_magnitude', v) },
+  { campo: 'tipo_magnitude' },
   { campo: 'profundidade_km', ordena: 'profundidade_km', numerico: true, formato: (v) => formatarNumero(v) },
-  { campo: 'faixa_profundidade', formato: (v) => rotuloValor('faixa_profundidade', v) },
+  { campo: 'faixa_profundidade' },
   { campo: 'latitude', numerico: true, formato: (v) => formatarNumero(v, 3) },
   { campo: 'longitude', numerico: true, formato: (v) => formatarNumero(v, 3) },
-  { campo: 'tsunami', formato: (v) => rotuloValor('tsunami', v) },
-  { campo: 'alerta', formato: (v) => rotuloValor('alerta', v) ?? '' },
+  { campo: 'tsunami', formato: (v) => String(v) },
+  { campo: 'alerta' },
   { campo: 'significancia', numerico: true, formato: (v) => formatarInteiro(v) },
   { campo: 'relatos', numerico: true, formato: (v) => formatarInteiro(v) },
   { campo: 'estacoes', numerico: true, formato: (v) => formatarInteiro(v) },
-  { campo: 'status', formato: (v) => rotuloValor('status', v) },
+  { campo: 'status' },
   { campo: 'usgs_id' },
 ]
 
@@ -116,7 +118,7 @@ export default function Dados({ filtros, versaoBase, aoMudarBase }) {
                       <td>{formatarData(c.iniciada_em, true)}</td>
                       <td>{c.origem === 'usgs' ? 'API do USGS' : c.origem}</td>
                       <td>{c.anos} {c.anos === 1 ? 'ano' : 'anos'}{c.magnitude_minima != null && ` · M ≥ ${formatarNumero(c.magnitude_minima)}`}</td>
-                      <td><span className={`etiqueta ${c.status === 'concluida' ? 'ok' : c.status === 'erro' ? 'erro' : ''}`}>{rotuloValor('status_coleta', c.status)}</span></td>
+                      <td><span className={`etiqueta ${c.status === 'concluida' ? 'ok' : c.status === 'erro' ? 'erro' : ''}`}>{c.status}</span></td>
                       <td className="num">{formatarInteiro(c.recebidos)}</td>
                       <td className="num">{formatarInteiro(c.novos)}</td>
                       <td className="num">{formatarInteiro(c.atualizados)}</td>
@@ -159,7 +161,7 @@ function Importacao({ aoImportar }) {
 
   return (
     <div className="grade-cartoes">
-      <Cartao titulo="Buscar dados no USGS" subtitulo="Baixa os terremotos do Chile dos últimos anos; os que já existem são atualizados, não duplicados">
+      <Cartao titulo="Buscar dados no USGS" subtitulo="Baixa os terremotos do mundo inteiro dos últimos anos; os que já existem são atualizados, não duplicados">
         <div className="formulario-linha">
           <label className="campo">
             Últimos (anos)
@@ -177,7 +179,7 @@ function Importacao({ aoImportar }) {
         {ocupado?.startsWith('Buscando') && <p className="texto-explicacao">{ocupado}</p>}
       </Cartao>
 
-      <Cartao titulo="Enviar um arquivo" subtitulo="CSV com as colunas do USGS (id, mag, time, latitude, longitude, depth…)">
+      <Cartao titulo="Enviar um arquivo" subtitulo={`${api.local ? 'CSV, JSON (inclusive GeoJSON) ou XML' : 'CSV'} com as colunas do USGS: id, mag, time, latitude, longitude e depth`}>
         <div
           className={`upload${arrastando ? ' arrastando' : ''}`}
           onClick={() => entrada.current.click()}
@@ -198,7 +200,7 @@ function Importacao({ aoImportar }) {
           <Icone nome="upload" tamanho={26} />
           <strong>{ocupado?.startsWith('Enviando') ? ocupado : 'Arraste um arquivo aqui ou clique para escolher'}</strong>
           <span>Os terremotos do arquivo são somados à base</span>
-          <input ref={entrada} type="file" accept=".csv,.json,.xml" hidden
+          <input ref={entrada} type="file" accept={FORMATOS_ACEITOS} hidden
             onChange={(e) => {
               enviar(e.target.files[0])
               e.target.value = ''

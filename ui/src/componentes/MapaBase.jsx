@@ -12,9 +12,9 @@ export function corDaRampa(valor, min, max) {
 }
 
 // limites: [[latMin, lonMin], [latMax, lonMax]]; o mapa se ajusta a eles quando `chave` muda
-export function MapaBase({ limites, chave, children }) {
+export function MapaBase({ limites, chave, ocupaTela = false, children }) {
   return (
-    <div className="mapa">
+    <div className={ocupaTela ? 'mapa ocupa-tela' : 'mapa'}>
       <MapContainer center={[-36, -71]} zoom={4} style={{ height: '100%', width: '100%' }}>
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />

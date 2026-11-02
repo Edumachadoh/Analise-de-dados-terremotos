@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import { CircleMarker, Tooltip } from 'react-leaflet'
-import { Aviso, Cabecalho, Carregando, Cartao, Metrica, Seletor } from '../componentes/comuns.jsx'
+import { Aviso, Cabecalho, Carregando, Cartao, Seletor } from '../componentes/comuns.jsx'
 import { corDaRampa, limitesDe, MapaBase, RAMPA } from '../componentes/MapaBase.jsx'
 import { amostrar, formatarData, formatarInteiro, formatarNumero } from '../lib/formato.js'
-import { rotulo, rotuloValor } from '../lib/rotulos.js'
+import { rotulo } from '../lib/rotulos.js'
 import { useTodosTerremotos } from '../lib/useTodosTerremotos.js'
 
 const MAX_PONTOS = 3000
@@ -36,6 +36,7 @@ export default function Mapa({ filtros, versaoBase }) {
     const [min, max] = faixaTamanho
     return 3 + (max > min ? (p[colTamanho] - min) / (max - min) : 0.5) * 11
   }
+  const amostrado = (dados?.length ?? 0) > MAX_PONTOS
   const passo = faixaCor ? (faixaCor[1] - faixaCor[0]) / RAMPA.length : 0
 
   return (
@@ -48,23 +49,28 @@ export default function Mapa({ filtros, versaoBase }) {
 
       {completo && dados.length > 0 && (
         <>
-          <div className="metricas">
-            <Metrica rotulo="Terremotos no mapa" valor={formatarInteiro(pontos.length)}
-              detalhe={dados.length > MAX_PONTOS ? `amostra de ${formatarInteiro(dados.length)} para manter o mapa fluido` : 'com os filtros aplicados'} />
-          </div>
-
-          <Cartao largo titulo="Mapa"
+          <Cartao largo
+            titulo={`${formatarInteiro(pontos.length)} terremotos no mapa`}
+            subtitulo={dados.length > MAX_PONTOS ? null : 'com os filtros aplicados'}
             controles={<>
               <Seletor rotulo="Cor por" valor={colCor} opcoes={opcoes} aoMudar={setColCor} />
               <Seletor rotulo="Tamanho por" valor={colTamanho} opcoes={opcoes} aoMudar={setColTamanho} />
             </>}>
-            <MapaBase limites={limitesDe(pontos)} chave={`${completo}-${total}`}>
+            {amostrado && (
+              <p className="nota-mapa">
+                <strong>Amostra:</strong> os filtros encontraram {formatarInteiro(dados.length)} terremotos, mas o mapa
+                mostra {formatarInteiro(MAX_PONTOS)} (1 a cada {formatarNumero(dados.length / MAX_PONTOS, 1)}, espalhados por
+                todo o período, sem priorizar a magnitude) para não travar. Use os filtros para ver menos pontos e todos de uma vez.
+              </p>
+            )}
+
+            <MapaBase ocupaTela limites={limitesDe(pontos)} chave={`${completo}-${total}`}>
               {pontos.map((p) => (
                 <CircleMarker key={p.id} center={[p.latitude, p.longitude]} radius={raio(p)}
                   pathOptions={{ color: '#fff', weight: 1, fillColor: faixaCor ? corDaRampa(p[colCor], ...faixaCor) : 'var(--serie-1)', fillOpacity: 0.8 }}>
                   <Tooltip>
                     <strong>{p.local || 'Sem descrição do local'}</strong><br />
-                    Magnitude: {formatarNumero(p.magnitude)} ({rotuloValor('tipo_magnitude', p.tipo_magnitude)})<br />
+                    Magnitude: {formatarNumero(p.magnitude)} ({p.tipo_magnitude})<br />
                     Profundidade: {formatarNumero(p.profundidade_km)} km<br />
                     {formatarData(p.data_hora, true)}
                   </Tooltip>

@@ -139,7 +139,7 @@ REST_FRAMEWORK = {
     # A base tem milhares de terremotos; sem paginação, uma listagem
     # devolveria tudo de uma vez. Com ela, cada página traz PAGE_SIZE itens
     # e a resposta inclui os links "next" e "previous".
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "api.paginacao.PaginacaoPadrao",
     "PAGE_SIZE": 50,
     # JSON para clientes (Postman, Streamlit, scripts) e a página navegável
     # do DRF para testes pelo navegador

@@ -1,14 +1,9 @@
 // Cliente da API REST do back-end (Django REST Framework, pasta backend/).
 // Todas as telas buscam os dados por aqui; nenhuma lê arquivo ou banco direto.
 
-const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
+import { ErroApi } from './erro.js'
 
-export class ErroApi extends Error {
-  constructor(mensagem, status) {
-    super(mensagem)
-    this.status = status
-  }
-}
+const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
 
 async function requisitar(caminho, opcoes = {}) {
   let resposta
@@ -26,6 +21,8 @@ async function requisitar(caminho, opcoes = {}) {
 // O DRF devolve {"detail": "..."} ou {"campo": ["erro", ...]}; vira um texto só
 function mensagemDeErro(corpo, status) {
   if (status === 502 && corpo?.mensagem) return `O USGS não respondeu: ${corpo.mensagem}`
+  // Importação que falhou: o back devolve o registro da coleta inteiro; só a mensagem interessa
+  if (corpo?.status === 'erro' && corpo.mensagem) return corpo.mensagem
   if (!corpo) return status === 0 ? 'Sem resposta da API.' : `A API respondeu com erro ${status}.`
   if (typeof corpo.detail === 'string') return corpo.detail
   if (Array.isArray(corpo)) return corpo.join(' ')
@@ -53,10 +50,13 @@ export function consulta(filtros = {}, extras = {}) {
   return texto ? `?${texto}` : ''
 }
 
-export const api = {
+export const apiReal = {
+  local: false,
+
   // ---------------------------------------------------------------- terremotos
-  listarTerremotos: (filtros, pagina = 1, ordenacao = '-data_hora') =>
-    requisitar(`/terremotos/${consulta(filtros, { page: pagina, ordering: ordenacao })}`),
+  // `tamanho` (opcional) vira ?page_size=; sem ele, o back entrega 50 por página
+  listarTerremotos: (filtros, pagina = 1, ordenacao = '-data_hora', tamanho) =>
+    requisitar(`/terremotos/${consulta(filtros, { page: pagina, ordering: ordenacao, page_size: tamanho })}`),
 
   // ---------------------------------------------------------------- estatísticas
   resumo: (filtros) => requisitar(`/estatisticas/${consulta(filtros)}`),
@@ -69,13 +69,12 @@ export const api = {
   importarDoUsgs: (anos, magnitudeMinima) =>
     requisitar('/coletas/', postJson({ anos, magnitude_minima: magnitudeMinima })),
 
-  // Rota ainda não existe no back (ver frontend/README.md)
   enviarArquivo(arquivo) {
     const formulario = new FormData()
     formulario.append('arquivo', arquivo)
-    return requisitar('/coletas/arquivo/', { method: 'POST', body: formulario }).catch((erro) => {
+    return requisitar('/coletas/upload/', { method: 'POST', body: formulario }).catch((erro) => {
       if (erro.status === 404 || erro.status === 405) {
-        throw new ErroApi('O back-end ainda não tem a rota de envio de arquivo (POST /api/coletas/arquivo/).', erro.status)
+        throw new ErroApi('O back-end ainda não tem a rota de envio de arquivo (POST /api/coletas/upload/).', erro.status)
       }
       throw erro
     })
