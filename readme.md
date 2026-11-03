@@ -1,6 +1,6 @@
-# Terremotos no mundo — USGS
+# Terremotos por região — USGS
 
-Aplicação web para análise de terremotos registrados no mundo inteiro, com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS).
+Aplicação web para análise de terremotos por **região** (cada continente e cada oceano), com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS). Na interface, o usuário escolhe uma região e todas as telas (painel, mapa e dados) passam a analisar só ela. O machine learning não foi alterado: continua global, como antes.
 
 ## Estrutura do repositório
 
@@ -9,14 +9,16 @@ O projeto tem duas partes que conversam **somente por uma API REST**:
 ```
 ├── backend/                  # API REST (Django + Django REST Framework)
 │   ├── api/, config/         #   a API: modelos, rotas, serviços de USGS, estatísticas e machine learning
-│   ├── data/                 #   CSV de exemplo para o upload e casos de teste do upload
+│   ├── data/                 #   polígonos das regiões (Natural Earth), CSV de exemplo e casos de teste do upload
 │   └── scripts/              #   arquivos vazios, não implementados
-├── ui/                       # interface web (React + Vite)
+├── ui/                       # interface web (React + Vite); veja ui/README.md
 └── readme.md
 ```
 
 - **Para rodar o back e o front juntos**, siga [Como rodar o projeto](#como-rodar-o-projeto).
 - **Para entender o código da API**, veja [Arquivos da API](#arquivos-da-api) e [Fluxo de uma requisição](#fluxo-de-uma-requisição).
+- **Para entender a divisão em continentes e oceanos**, veja [Regiões](#regiões-continentes-e-oceanos).
+- **Para a interface**, veja [Interface](#interface).
 
 ---
 
@@ -26,11 +28,13 @@ O projeto tem duas partes que conversam **somente por uma API REST**:
 2. [Comandos da base de dados](#comandos-da-base-de-dados)
 3. [Endpoints da API](#endpoints-da-api)
 4. [Dados na API](#dados-na-api)
-5. [Arquivos da API](#arquivos-da-api)
-6. [Fluxo de uma requisição](#fluxo-de-uma-requisição)
-7. [Testes](#testes)
-8. [Dados utilizados](#dados-utilizados)
-9. [Limitações dos dados](#limitações-dos-dados)
+5. [Regiões: continentes e oceanos](#regiões-continentes-e-oceanos)
+6. [Arquivos da API](#arquivos-da-api)
+7. [Fluxo de uma requisição](#fluxo-de-uma-requisição)
+8. [Interface](#interface)
+9. [Testes](#testes)
+10. [Dados utilizados](#dados-utilizados)
+11. [Limitações dos dados](#limitações-dos-dados)
 
 ---
 
@@ -82,6 +86,7 @@ pip install -r requirements.txt
 | `djangorestframework` | API REST: serializers, views e respostas JSON |
 | `django-filter` | filtros por parâmetro de URL (`?magnitude_min=5`) |
 | `pandas`, `numpy` | leitura de CSV, limpeza e montagem da tabela de treino |
+| `shapely` | geometria: decide em qual continente ou oceano cai cada terremoto |
 | `scikit-learn`, `joblib` | modelos de machine learning e gravação dos modelos treinados |
 | `requests` | chamadas à API do USGS |
 | `python-dotenv` | leitura do arquivo `.env` |
@@ -110,15 +115,18 @@ Sem a `SECRET_KEY`, o Django não inicia e mostra a mensagem `SECRET_KEY não de
 python manage.py migrate
 ```
 
-Esse comando cria o arquivo `backend/db.sqlite3` com as tabelas `api_terremoto`, `api_coleta` e `api_modelotreinado`.
+Esse comando cria o arquivo `backend/db.sqlite3` com as tabelas `api_regiao`, `api_terremoto`, `api_coleta` e `api_modelotreinado`.
 
 **2.5. Carregar os terremotos**
 
 ```bash
+python manage.py carregar_regioes
 python manage.py importar_terremotos
 ```
 
-Baixa do USGS os terremotos do mundo inteiro dos últimos 3 anos, com magnitude ≥ 2,5 (cerca de 83 mil eventos), e grava no banco. Leva alguns minutos. Outras formas de carregar dados estão em [Comandos da base de dados](#comandos-da-base-de-dados).
+O primeiro comando cadastra as 12 regiões (7 continentes e 5 oceanos, veja [Regiões](#regiões-continentes-e-oceanos)) e classifica os terremotos que já estão no banco. O segundo baixa do USGS os terremotos do mundo inteiro dos últimos 3 anos, com magnitude ≥ 2,5, como antes. Para importar só uma região, use a interface: escolha a região e clique em "Buscar no USGS" (ou `POST /api/regioes/{codigo}/importar/`), que baixa só o que cai na região, com magnitude ≥ 4,0 por padrão. Outras formas de carregar dados estão em [Comandos da base de dados](#comandos-da-base-de-dados).
+
+Os códigos são `africa`, `antartida`, `asia`, `europa`, `america-do-norte`, `oceania`, `america-do-sul`, `oceano-pacifico`, `oceano-atlantico`, `oceano-indico`, `oceano-artico` e `oceano-antartico` (também em `GET /api/regioes/`).
 
 **2.6. Iniciar a API**
 
@@ -138,7 +146,9 @@ npm install
 npm run dev
 ```
 
-A interface fica em `http://localhost:5173`. As chamadas para `/api` são repassadas pelo Vite para `http://127.0.0.1:8000`, então **a API precisa estar rodando**. Se a API estiver em outro endereço, copie `ui/.env.example` para `ui/.env` e ajuste `VITE_API_URL`.
+A interface fica em `http://localhost:5173`. As chamadas para `/api` são repassadas pelo Vite para `http://127.0.0.1:8000`, então **a API precisa estar rodando** (a interface não tem mais uma fonte própria de dados). Se a API estiver em outro endereço, copie `ui/.env.example` para `ui/.env` e ajuste `VITE_API_URL`.
+
+Na primeira abertura, a tela **Regiões** mostra o mapa. Escolha uma região que já tem terremotos e clique em "Analisar", ou escolha uma sem dados e clique em "Buscar no USGS".
 
 ### 4. Treinar o primeiro modelo
 
@@ -178,12 +188,13 @@ Todos os comandos `python manage.py` são rodados dentro de `backend/`, com o am
 ### Baixar do USGS e gravar no banco
 
 ```bash
-python manage.py importar_terremotos                         # últimos 3 anos, M >= 2,5 (padrão)
-python manage.py importar_terremotos --anos 6                # últimos 6 anos
+python manage.py carregar_regioes                         # cadastra continentes e oceanos e classifica os terremotos
+python manage.py importar_terremotos                      # últimos 3 anos, M >= 2,5 (padrão)
+python manage.py importar_terremotos --anos 6             # últimos 6 anos
 python manage.py importar_terremotos --magnitude-minima 4.0  # outra magnitude mínima
 ```
 
-Eventos que já estão no banco são **atualizados, não duplicados**: a comparação é feita pelo `id` do USGS. Pela API, o equivalente é `POST /api/coletas/`.
+Eventos que já estão no banco são **atualizados, não duplicados**: a comparação é feita pelo `id` do USGS. Pela API, o equivalente é `POST /api/coletas/` (mundo inteiro) ou `POST /api/regioes/{codigo}/importar/` (só uma região).
 
 ### Baixar um período do USGS para um CSV (sem gravar no banco)
 
@@ -208,7 +219,7 @@ curl -F "arquivo=@data/terremotos_global_m2.5_6a3anos.csv" http://127.0.0.1:8000
 python manage.py importar_terremotos --arquivo data/terremotos_global_m2.5_6a3anos.csv
 ```
 
-O CSV precisa ter as colunas do USGS. São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth`; as demais são opcionais. A coluna `time` pode vir em milissegundos (como na API do USGS) ou como data ISO (como nos CSVs gerados pelo `baixar_csv` e no CSV baixado do site do USGS). Linhas inválidas, de outro tipo de evento (`type` diferente de `earthquake`) ou abaixo da magnitude mínima (padrão 2,5) são descartadas, e a quantidade aparece na `mensagem` da coleta.
+O CSV precisa ter as colunas do USGS. São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth`; as demais são opcionais. A coluna `time` pode vir em milissegundos (como na API do USGS) ou como data ISO (como nos CSVs gerados pelo `baixar_csv` e no CSV baixado do site do USGS). Linhas inválidas, de outro tipo de evento (`type` diferente de `earthquake`) ou abaixo da magnitude mínima (padrão 2,5) são descartadas, e a quantidade aparece na `mensagem` da coleta. Um CSV não precisa de região: cada terremoto gravado recebe a região a que pertence pelas coordenadas.
 
 ### Exemplo: montar uma base de 6 anos
 
@@ -223,8 +234,10 @@ Os dois períodos precisam **emendar** (6 a 3 anos + 3 anos até hoje). O modelo
 ### Ver o estado da base
 
 ```bash
-curl http://127.0.0.1:8000/api/estatisticas/   # total, magnitudes, período e o evento mais forte
-curl http://127.0.0.1:8000/api/coletas/        # histórico de importações
+curl http://127.0.0.1:8000/api/regioes/                           # quantos terremotos há em cada continente e oceano
+curl http://127.0.0.1:8000/api/estatisticas/                      # total, magnitudes, período e o evento mais forte
+curl "http://127.0.0.1:8000/api/estatisticas/?regiao=asia"        # o mesmo, só da Ásia
+curl http://127.0.0.1:8000/api/coletas/                           # histórico de importações
 ```
 
 ### Limpar a base
@@ -252,7 +265,7 @@ Terremoto.objects.filter(data_hora__lt=timezone.now() - timedelta(days=365 * 3))
 exit()
 ```
 
-Depois de limpar ou trocar a base, **treine os modelos de novo**: cada modelo usa a base que existia no momento do treino. Para recomeçar do zero, também é possível apagar o arquivo `backend/db.sqlite3` e rodar `python manage.py migrate` de novo.
+As regiões (`api_regiao`) não são apagadas por isso; se mudar os polígonos em `data/fontes/`, rode `python manage.py carregar_regioes` para recalcular a região de cada terremoto. Depois de limpar ou trocar a base, **treine os modelos de novo**: cada modelo usa a base que existia no momento do treino. Para recomeçar do zero, também é possível apagar o arquivo `backend/db.sqlite3` e rodar `python manage.py migrate` de novo.
 
 ---
 
@@ -267,7 +280,7 @@ Para saber quais ações gravam no banco, veja [O que grava no banco e o que nã
 | Método | Endpoint | Funcionalidade |
 |---|---|---|
 | GET | `/api/` | página inicial da API: lista os grupos de endpoints (navegável no navegador) |
-| GET | `/api/terremotos/` | lista os terremotos do banco, 50 por página, com filtros (magnitude, profundidade, datas, coordenadas, local, tsunami, alerta) e ordenação |
+| GET | `/api/terremotos/` | lista os terremotos do banco, 50 por página, com filtros (região, magnitude, profundidade, datas, coordenadas, local, tsunami, alerta) e ordenação |
 | POST | `/api/terremotos/` | cadastra um terremoto manualmente; valida as faixas de latitude, longitude, profundidade e magnitude e recusa `usgs_id` repetido |
 | GET | `/api/terremotos/{id}/` | mostra um terremoto, incluindo a faixa de profundidade calculada (raso, intermediário ou profundo) |
 | PUT, PATCH | `/api/terremotos/{id}/` | altera um terremoto: todos os campos (PUT) ou só alguns (PATCH) |
@@ -278,7 +291,11 @@ Para saber quais ações gravam no banco, veja [O que grava no banco e o que nã
 | GET | `/api/estatisticas/por-profundidade/` | quantidade e magnitude média por faixa de profundidade |
 | GET | `/api/coletas/` | histórico de importações: quando, de onde (USGS ou nome do CSV), status e quantos eventos novos e atualizados |
 | GET | `/api/coletas/{id}/` | detalhe de uma importação, incluindo a mensagem de erro ou de linhas descartadas |
-| POST | `/api/coletas/` | baixa do USGS os terremotos dos últimos N anos e grava no banco, atualizando os que já existem |
+| GET | `/api/regioes/` | os continentes e oceanos (tipo, magnitude de completude) e `total_terremotos`, quantos eventos da base pertencem a cada um. `?com_dados=true` lista só os que têm |
+| GET | `/api/regioes/mapa/` | os polígonos de todas as regiões (GeoJSON), da faixa de costa dos continentes e o ponto onde escrever o nome; é o que a interface desenha no mapa |
+| GET | `/api/regioes/{codigo}/` | detalhe de uma região |
+| POST | `/api/coletas/` | baixa do USGS os terremotos do mundo inteiro dos últimos N anos e grava no banco, atualizando os que já existem |
+| POST | `/api/regioes/{codigo}/importar/` | baixa do USGS os terremotos da região dos últimos N anos (`anos`, `magnitude_minima`) e grava no banco, atualizando os que já existem |
 | POST | `/api/coletas/upload/` | recebe um arquivo CSV com as colunas do USGS, valida, descarta linhas inválidas e grava no banco sem duplicar |
 | GET | `/api/modelos/` | lista os modelos treinados, com algoritmo, parâmetros, métricas e qual está ativo |
 | POST | `/api/modelos/` | treina um modelo com o algoritmo e os parâmetros escolhidos; o novo modelo passa a ser o ativo. Com `atualizar_dados`, baixa dados novos antes (re-treino) |
@@ -299,6 +316,7 @@ Filtros de `GET /api/terremotos/`, que valem também para todos os endpoints de 
 | `magnitude_min`, `magnitude_max` | `?magnitude_min=5` | faixa de magnitude |
 | `profundidade_min`, `profundidade_max` | `?profundidade_max=70` | faixa de profundidade, em km |
 | `data_inicio`, `data_fim` | `?data_inicio=2025-01-01` | período (AAAA-MM-DD) |
+| `regiao` | `?regiao=america-do-sul` | código do continente ou oceano (veja [Regiões](#regiões-continentes-e-oceanos)); código inexistente dá 400 |
 | `latitude_min`, `latitude_max`, `longitude_min`, `longitude_max` | `?latitude_min=24&latitude_max=46` | recorte geográfico |
 | `local` | `?local=japan` | texto contido no local (sem diferenciar maiúsculas) |
 | `faixa_profundidade` | `?faixa_profundidade=raso` | `raso`, `intermediario` ou `profundo` |
@@ -306,39 +324,42 @@ Filtros de `GET /api/terremotos/`, que valem também para todos os endpoints de 
 | `alerta` | `?alerta=red` | nível de alerta PAGER |
 | `ordering` | `?ordering=-magnitude` | ordenação por `data_hora`, `magnitude` ou `profundidade_km` (`-` = decrescente) |
 
-Exemplo: os terremotos mais fortes do Japão em 2025:
+Exemplo: os terremotos mais fortes da Ásia em 2025:
 
 ```
-GET /api/terremotos/?local=japan&data_inicio=2025-01-01&data_fim=2025-12-31&ordering=-magnitude
+GET /api/terremotos/?regiao=asia&data_inicio=2025-01-01&data_fim=2025-12-31&ordering=-magnitude
 ```
 
-### Coletas (importação)
+### Regiões e importação
 
-**`POST /api/coletas/`**: baixa do USGS. Corpo JSON, todos os campos opcionais:
+**`GET /api/regioes/`**: as 12 regiões, cada uma com `codigo`, `nome`, `tipo` (`continente` ou `oceano`), `magnitude_completude` e `total_terremotos`. Sem paginação.
+
+**`POST /api/regioes/{codigo}/importar/`**: baixa do USGS os terremotos da região. Corpo JSON, todos os campos opcionais:
 
 ```json
-{"anos": 3, "magnitude_minima": 2.5}
+{"anos": 3, "magnitude_minima": 4.0}
 ```
 
-**`POST /api/coletas/upload/`**: envia um CSV, em `multipart/form-data`:
+Sem `magnitude_minima`, vale a magnitude de completude da região. **`POST /api/coletas/`** continua baixando o mundo inteiro (corpo `{"anos": 3, "magnitude_minima": 2.5}`). **`POST /api/coletas/upload/`**: envia um CSV, em `multipart/form-data`:
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
 | `arquivo` | sim | `.csv` com as colunas do USGS, até 50 MB |
 | `magnitude_minima` | não | padrão 2,5 |
 
-As duas respondem com o registro da coleta:
+As três respondem com o registro da coleta:
 
 ```json
-{"id": 5, "origem": "terremotos_global_m2", "status": "concluida",
- "recebidos": 81721, "novos": 81655, "atualizados": 66, "mensagem": ""}
+{"id": 5, "origem": "usgs", "status": "concluida",
+ "recebidos": 8093, "novos": 120, "atualizados": 7973, "mensagem": ""}
 ```
 
 | Status HTTP | Quando |
 |---|---|
 | 201 | importação concluída |
-| 400 | dados inválidos: extensão errada, arquivo grande demais, CSV ilegível ou colunas obrigatórias faltando |
-| 502 | o USGS não respondeu (só em `POST /api/coletas/`) |
+| 400 | dados inválidos: extensão errada, arquivo grande demais, CSV ilegível, colunas obrigatórias faltando ou, na importação, região sem recorte para consultar |
+| 404 | região inexistente (`POST /api/regioes/{codigo}/importar/`) |
+| 502 | o USGS não respondeu (em `POST /api/regioes/{codigo}/importar/` e em `POST /api/coletas/`) |
 
 ### Modelos (machine learning)
 
@@ -399,7 +420,7 @@ Cada célula da resposta traz os limites de latitude e longitude, o centro, a `p
 
 ## Dados na API
 
-A API guarda os terremotos no banco SQLite (`backend/db.sqlite3`). Os dados vêm do USGS e cobrem **o mundo inteiro**, com **magnitude a partir de 2,5**, nos **últimos 3 anos**.
+A API guarda os terremotos no banco SQLite (`backend/db.sqlite3`). Os dados vêm do USGS, região por região, com a **magnitude de completude de cada região** (padrão 4,0) como mínima, nos **últimos 3 anos**. Cada terremoto guarda a região a que pertence na coluna `zona`.
 
 ### Configuração
 
@@ -412,7 +433,7 @@ ANOS_COLETA_PADRAO = 3                         # base padrão: últimos 3 anos
 ANOS_RETREINO = 6                              # re-treino com atualização: últimos 6 anos
 ```
 
-Para analisar só uma região, basta trocar `REGIAO_ANALISE` por um recorte menor. Por exemplo, Japão: `(24.0, 46.0, 122.0, 146.0)`.
+Esses valores valem para `POST /api/coletas/`, para `importar_terremotos`, para o upload de CSV e para o re-treino. A importação **por região** (`POST /api/regioes/{codigo}/importar/`, usada pela interface) consulta só as caixas da região e usa por padrão a **magnitude de completude** dela (`Regiao.magnitude_completude`, 4,0), que pode ser ajustada no admin (`/admin/`).
 
 O upload de CSV (`POST /api/coletas/upload/`) aceita só a extensão `.csv` e no máximo 50 MB, definidos em `UPLOAD_EXTENSOES` e `UPLOAD_TAMANHO_MAXIMO_MB`.
 
@@ -420,16 +441,68 @@ Os comandos para carregar, exportar e limpar os dados estão em [Comandos da bas
 
 ### Base atual
 
+Números da base de desenvolvimento (importação global antiga, M ≥ 2,5, mais as importações por região); a sua pode ser diferente.
+
 | | |
 |---|---|
-| Terremotos | 83.357 |
-| Com magnitude ≥ 4 | 49.437 |
+| Terremotos | 165.163 |
+| Com magnitude ≥ 4 | 97.366 |
 | Magnitude | de 2,5 a 8,8 |
-| Período | 31/10/2023 a 30/10/2026 |
+| Período | 31/10/2020 a 02/11/2026 |
+
+| Região | Terremotos |
+|---|---|
+| América do Norte | 55.269 |
+| Oceano Pacífico | 45.179 |
+| Ásia | 34.039 |
+| América do Sul | 8.093 |
+| Oceania | 8.158 |
+| Oceano Atlântico | 6.495 |
+| Oceano Índico | 3.643 |
+| Europa | 2.310 |
+| África | 1.119 |
+| Oceano Antártico | 437 |
+| Oceano Ártico | 344 |
+| Antártida | 76 |
 
 ### Impacto no modelo de machine learning
 
 O modelo divide o mapa em células de 1° × 1° (cerca de 110 km de lado) e estima, para cada uma, a probabilidade de um terremoto acima da magnitude-alvo nos próximos 30 dias. No mundo inteiro, a grade completa teria 64.800 células, e a maioria delas fica em oceanos ou em regiões estáveis que nunca registram eventos. Por isso **só entram as células com ao menos um terremoto na base**. Com a base atual e magnitude-alvo 4,0, são 5.393 células e cerca de 189 mil linhas de treino.
+
+---
+
+## Regiões: continentes e oceanos
+
+A unidade de análise é a **região**: um dos 7 continentes (África, Antártida, Ásia, Europa, América do Norte, Oceania, América do Sul) ou um dos 5 oceanos (Pacífico, Atlântico, Índico, Ártico, Antártico). Estatísticas, mapa, dados e importação do USGS são de uma região, e a interface analisa uma por vez. O machine learning (modelos e previsões) não usa as regiões.
+
+| Código | Região | Tipo |
+|---|---|---|
+| `africa`, `antartida`, `asia`, `europa` | África, Antártida, Ásia, Europa | continente |
+| `america-do-norte`, `america-do-sul`, `oceania` | América do Norte, América do Sul, Oceania | continente |
+| `oceano-pacifico`, `oceano-atlantico`, `oceano-indico`, `oceano-artico`, `oceano-antartico` | Oceano Pacífico, Atlântico, Índico, Ártico, Antártico | oceano |
+
+### De onde vêm os polígonos
+
+`python manage.py carregar_regioes` monta as regiões a partir de dois arquivos do [Natural Earth](https://www.naturalearthdata.com/) (domínio público, resolução 110 m) em `backend/data/fontes/`:
+
+- `ne_110m_admin_0_countries.geojson`: os países, com o campo `CONTINENT`. Cada continente é a união dos seus países.
+- `ne_110m_geography_marine_polys.geojson`: os oceanos. O Pacífico e o Atlântico juntam as partes norte e sul.
+
+Duas correções sobre o Natural Earth, que o comando aplica: a Rússia a leste dos Urais (60°E, mais a Chukotka, do outro lado do antimeridiano) vai para a **Ásia**, e não para a Europa; e a Guiana Francesa vai para a **América do Sul**, e não para a França.
+
+Cada continente também ganha uma `costa`: o polígono dele com uma faixa de 2° (cerca de 200 km) de mar em volta. As regiões ficam na tabela `api_regiao`, com o polígono, a `costa`, as caixas para consultar o USGS e a `magnitude_completude`, que não é sobrescrita ao recarregar. O comando também recalcula a região de todos os terremotos da base.
+
+### Como um terremoto recebe a região
+
+A regra está em `api/services/zonas.py`, e o teste ponto-em-polígono é feito em lote com o `shapely`:
+
+1. **dentro de um continente:** é daquele continente;
+2. **no mar, junto à costa** (até uns 200 km): é do continente mais próximo dentre os que alcançam o ponto. Assim a costa e a fossa do Chile ficam na América do Sul, e a do Japão na Ásia;
+3. **no mar aberto:** é do oceano que contém o ponto (ou o mais próximo, nos mares que os polígonos dos oceanos não cobrem).
+
+O resultado fica gravado na coluna `Terremoto.zona`, então cada evento pertence a **uma região só** e as estatísticas de duas regiões nunca contam o mesmo terremoto. A classificação acontece na importação (inclusive no upload de CSV) e em `carregar_regioes`. O filtro `?regiao=` da API é só `zona = codigo`.
+
+Para consultar o USGS usa-se uma **caixa** (retângulo) por parte da região. As caixas das regiões se sobrepõem e pegam eventos de vizinhas; eles são gravados normalmente, cada um na sua região.
 
 ---
 
@@ -460,14 +533,18 @@ backend/
 │   ├── services/                  # regras de negócio
 │   │   ├── usgs.py
 │   │   ├── importacao.py
+│   │   ├── zonas.py               # decide a região de cada terremoto
 │   │   ├── estatisticas.py
 │   │   └── ml.py
 │   ├── management/commands/       # comandos do terminal (python manage.py ...)
+│   │   ├── carregar_regioes.py
 │   │   ├── importar_terremotos.py
 │   │   └── baixar_csv.py
 │   └── migrations/
-│       └── 0001_initial.py
+│       ├── 0001_initial.py
+│       └── 0002_regioes.py
 ├── data/
+│   ├── fontes/                              # polígonos do Natural Earth (países e oceanos)
 │   ├── terremotos_global_m2.5_6a3anos.csv   # exemplo real para o upload (6 a 3 anos atrás)
 │   └── testes_upload/                       # casos de teste manuais do upload
 └── scripts/                       # dois arquivos vazios, não implementados
@@ -488,22 +565,23 @@ A API segue uma divisão em camadas: as **views** só recebem a requisição e d
 
 | Arquivo | Função |
 |---|---|
-| `models.py` | define as três tabelas do banco. **`Terremoto`**: um evento do USGS (local, coordenadas, profundidade, magnitude, data, impacto e qualidade do registro), com `usgs_id` único e a faixa de profundidade calculada. **`Coleta`**: o registro de cada importação (origem, status, recebidos, novos, atualizados, mensagem). **`ModeloTreinado`**: um modelo de ML (algoritmo, parâmetros, métricas, período dos dados, se é o ativo). |
+| `models.py` | define as quatro tabelas do banco. **`Regiao`**: um continente ou oceano (polígono, faixa de costa, caixas para consultar o USGS, magnitude de completude e tamanho da célula). **`Terremoto`**: um evento do USGS (local, coordenadas, profundidade, magnitude, data, impacto, qualidade do registro e a região `zona`), com `usgs_id` único e a faixa de profundidade calculada. **`Coleta`**: o registro de cada importação (origem, status, recebidos, novos, atualizados, mensagem). **`ModeloTreinado`**: um modelo de ML (algoritmo, parâmetros, métricas, período dos dados, se é o ativo), como era. |
 | `serializers.py` | converte objetos em JSON e valida o que chega. Valida as faixas de latitude e magnitude, o upload (extensão, tamanho, magnitude mínima), os campos do treino (algoritmo e hiperparâmetros) e os parâmetros da previsão. |
-| `views.py` | os cinco grupos de endpoints (ViewSets): `TerremotoViewSet` (CRUD), `EstatisticaViewSet`, `ColetaViewSet` (importação do USGS e upload), `ModeloViewSet` (treino, ativação, algoritmos) e `PrevisaoViewSet`. Decide o status HTTP de cada resposta. |
+| `views.py` | os seis grupos de endpoints (ViewSets): `RegiaoViewSet` (lista, mapa e importação do USGS por região), `TerremotoViewSet` (CRUD), `EstatisticaViewSet`, `ColetaViewSet` (importação do USGS, histórico e upload de CSV), `ModeloViewSet` (treino, ativação, algoritmos) e `PrevisaoViewSet`. Decide o status HTTP de cada resposta. |
 | `urls.py` | registra os ViewSets num `DefaultRouter`, que gera as URLs de `/api/` e a página navegável com a lista de endpoints |
-| `filters.py` | `TerremotoFilter`: os filtros por parâmetro de URL (magnitude, profundidade, datas, coordenadas, local, faixa de profundidade, tsunami, alerta) |
-| `admin.py` | registra as três tabelas no painel `/admin/` |
+| `filters.py` | `TerremotoFilter`: os filtros por parâmetro de URL (região, magnitude, profundidade, datas, coordenadas, local, faixa de profundidade, tsunami, alerta) |
+| `admin.py` | registra as quatro tabelas no painel `/admin/` (os polígonos das regiões ficam de fora do formulário) |
 | `apps.py` | configuração da aplicação `api` para o Django |
-| `tests.py` | os 31 testes automatizados (veja [Testes](#testes)) |
+| `tests.py` | os 47 testes automatizados (veja [Testes](#testes)) |
 | `coleta.py` | **script antigo, independente da API**: baixa uma região do USGS (`chile`, `japao`, `indonesia`, `california` ou `global`) e salva CSV em `backend/data/raw/`. Roda com `python api/coleta.py`, com os filtros no topo do arquivo. Nada na API o importa; o comando `baixar_csv` faz o mesmo papel usando o cliente da API. |
 
 ### Regras de negócio (`api/services/`)
 
 | Arquivo | Função |
 |---|---|
-| `usgs.py` | cliente da API do USGS. Monta os parâmetros (região, período, magnitude), refaz a requisição em falhas de rede e contorna o limite de 20.000 eventos por consulta: confere o total com `count` e divide a janela ao meio até caber. `buscar_terremotos(anos)` baixa os últimos N anos; `buscar_periodo(inicio, fim)` baixa um intervalo. **Não acessa o banco.** |
-| `importacao.py` | grava os terremotos no banco. Converte GeoJSON (API do USGS) e CSV em objetos `Terremoto`; no CSV, confere as colunas obrigatórias, aceita `time` em milissegundos ou data ISO e descarta linhas inválidas. Insere os novos e atualiza os existentes pelo `usgs_id` (sem duplicar), em lote, e registra o resultado numa `Coleta`. |
+| `usgs.py` | cliente da API do USGS. Monta os parâmetros (caixas, período, magnitude), refaz a requisição em falhas de rede e contorna o limite de 20.000 eventos por consulta: confere o total com `count` e divide a janela ao meio até caber. `buscar_terremotos(anos, magnitude, caixas)` baixa os últimos N anos; `buscar_periodo(inicio, fim, magnitude, caixas)` baixa um intervalo. Com várias caixas, consulta uma por vez e remove duplicatas. **Não acessa o banco.** |
+| `importacao.py` | grava os terremotos no banco. Converte GeoJSON (API do USGS) e CSV em objetos `Terremoto`; no CSV, confere as colunas obrigatórias, aceita `time` em milissegundos ou data ISO e descarta linhas inválidas. Atribui a região de cada evento (`zonas.py`), insere os novos e atualiza os existentes pelo `usgs_id` (sem duplicar), em lote, e registra o resultado numa `Coleta`. `importar_do_usgs(anos, magnitude, regiao=None)` consulta o mundo inteiro ou, com `regiao`, as caixas dela. |
+| `zonas.py` | classifica os terremotos em continentes e oceanos. `Classificador` testa muitos pontos de uma vez com o `shapely` (dentro do continente, faixa de costa, oceano); `atribuir` preenche a região de eventos ainda não salvos e `reclassificar` recalcula a base inteira, gravando só o que mudou. |
 | `estatisticas.py` | agregações para os gráficos: resumo (total, magnitudes, período, evento mais forte), contagem por mês, por faixa de magnitude e por faixa de profundidade. Recebe a consulta já filtrada. |
 | `ml.py` | machine learning. Lista os 6 algoritmos e valida os hiperparâmetros; monta a tabela **célula × período de 30 dias** com o alvo (houve terremoto ≥ magnitude-alvo?) e as features, que só olham o passado; treina com divisão temporal (os últimos períodos são o teste), calcula as métricas e compara com um baseline; salva o modelo em `media/modelos/`; e gera as previsões por célula. |
 
@@ -511,6 +589,7 @@ A API segue uma divisão em camadas: as **views** só recebem a requisição e d
 
 | Arquivo | Comando | Função |
 |---|---|---|
+| `carregar_regioes.py` | `python manage.py carregar_regioes` | cria ou atualiza os continentes e oceanos a partir de `data/fontes/` e reclassifica os terremotos da base |
 | `importar_terremotos.py` | `python manage.py importar_terremotos` | baixa do USGS e grava no banco, ou importa um CSV com `--arquivo` |
 | `baixar_csv.py` | `python manage.py baixar_csv --de 6 --ate 3` | baixa um período do USGS e salva em CSV em `backend/data/`, **sem gravar no banco** |
 
@@ -519,6 +598,7 @@ A API segue uma divisão em camadas: as **views** só recebem a requisição e d
 | Arquivo | Função |
 |---|---|
 | `0001_initial.py` | cria as tabelas `api_terremoto`, `api_coleta` e `api_modelotreinado` quando se roda `python manage.py migrate` |
+| `0002_regioes.py` | cria `api_regiao` e a coluna `zona` dos terremotos |
 
 ---
 
@@ -546,7 +626,22 @@ api/models.py  ──►  db.sqlite3        insere os novos e atualiza os existe
 Resposta JSON                         201 com recebidos, novos, atualizados e mensagem
 ```
 
-Os outros endpoints seguem o mesmo caminho, trocando o serviço: a importação do USGS passa por `usgs.py` antes de `importacao.py`; as estatísticas usam `filters.py` e `estatisticas.py`; o treino e as previsões usam `ml.py`.
+Os outros endpoints seguem o mesmo caminho, trocando o serviço: a importação do USGS passa por `usgs.py` e por `zonas.py` (que atribui a região de cada evento) antes de `importacao.py`; as estatísticas usam `filters.py` (inclusive `?regiao=`) e `estatisticas.py`; o treino e as previsões usam `ml.py`, sem relação com as regiões.
+
+---
+
+## Interface
+
+A interface (`ui/`, React + Vite; detalhes em [`ui/README.md`](ui/README.md)) fala só com a API e analisa **uma região por vez**:
+
+| Tela | O que mostra |
+|---|---|
+| **Regiões** | tela inicial: um mapa com os continentes (e a faixa de mar junto à costa) e os oceanos, e, ao lado dele, o painel da região escolhida (botão Analisar e importação do USGS) e a lista de todas as regiões, com a contagem de terremotos. Dali se escolhe a região, se analisa e se importam dados do USGS |
+| **Painel** | totais, terremotos por mês, por faixa de magnitude e de profundidade, correlações e a análise que prepara o ML |
+| **Mapa** | epicentros da região, com cor e tamanho pela coluna escolhida |
+| **Dados** | tabela paginada, histórico de importações da região, busca no USGS e envio de CSV |
+
+Os filtros da barra lateral valem para Painel, Mapa e Dados; a região escolhida vai junto em todas as consultas como `?regiao=`. O mapa da tela Regiões vem de `GET /api/regioes/mapa/`, os mesmos polígonos que o back usa para classificar os terremotos. As telas Modelos e Previsões continuam desligadas no menu, como estavam, e não usam as regiões. O gráfico "por região sísmica" do Painel usa caixas próprias (`ui/src/lib/regioesSismicas.js`), independentes das regiões da API.
 
 ---
 
@@ -560,13 +655,17 @@ Ficam em `backend/api/tests.py` e rodam com:
 python manage.py test api
 ```
 
-São **31 testes**, em cinco grupos:
+São **47 testes**, em nove grupos:
 
 | Classe | Testes | O que verifica |
 |---|---|---|
 | `TerremotoApiTests` | 6 | paginação, filtros, filtro inválido (400), CRUD completo (criar, alterar, apagar), validação das faixas de latitude e magnitude, `usgs_id` duplicado (400) |
+| `RegiaoTests` | 6 | filtro `?regiao=` (e código inexistente, 400), estatísticas por região, lista de regiões com a contagem de terremotos e `?com_dados=true`, detalhe (e 404), importação de região sem recorte (400) |
+| `ClassificacaoTests` | 6 | a regra de terra, costa e mar: dentro do continente, mar junto à costa vai para o continente mais próximo, mar aberto vai para o oceano, ponto fora de todos os polígonos vai para o oceano mais próximo, `reclassificar` igual a `atribuir`, importação que grava a região do evento |
+| `CorrecaoDeContinentesTests` | 1 | a Rússia a leste dos Urais vai para a Ásia e a Guiana Francesa para a América do Sul |
 | `EstatisticaTests` | 4 | resumo, resumo com filtros, contagem por faixa de magnitude e de profundidade, contagem por mês |
 | `ImportacaoTests` | 4 | importação do USGS sem duplicar (atualiza o que já existe), conversão de coordenadas e de tempo, `POST /api/coletas/`, USGS fora do ar (502, coleta registrada com erro) |
+| `ImportacaoPorRegiaoTests` | 3 | importação de uma região pela API (consulta só as caixas dela, com a magnitude de completude), USGS fora do ar (502, coleta registrada com erro) e região inexistente (404) |
 | `UploadCsvTests` | 8 | CSV com as colunas do USGS, `time` em data ISO, reenvio que atualiza sem duplicar, descarte de magnitude baixa e de outros tipos de evento, magnitude mínima configurável, colunas ausentes (400), extensão inválida (400), envio sem arquivo (400) |
 | `MlTests` | 9 | validação dos hiperparâmetros, painel sem vazamento do futuro, treino dos 6 algoritmos, ativação de modelo, previsão geral e por ponto, ponto fora da região (400), previsão sem modelo (404), magnitude-alvo sem casos (400), re-treino que atualiza os dados, exclusão do modelo e do arquivo |
 
@@ -601,17 +700,20 @@ Além dos testes, estas verificações foram feitas com a base real durante o de
 
 | Verificação | Resultado |
 |---|---|
-| Importação global do USGS (3 anos, M ≥ 2,5) | 83 mil terremotos gravados. Revelou e corrigiu um erro do SQLite (`too many SQL variables`): a checagem dos ids existentes passou a ser feita em lotes de 10 mil. |
+| Importação global do USGS (3 anos, M ≥ 2,5), antes das regiões | 83 mil terremotos gravados. Revelou e corrigiu um erro do SQLite (`too many SQL variables`): a checagem dos ids existentes passou a ser feita em lotes de 10 mil. |
 | Upload do CSV de 6 a 3 anos atrás | 81.721 recebidos, 81.655 novos e 66 atualizados (os eventos da emenda): o upload não duplica |
 | Continuidade da base de 6 anos | 73 meses seguidos, sem intervalo vazio na emenda entre os dois períodos |
 | Montagem da tabela de ML com a base global | cerca de 10 segundos, 5.393 células e 189 mil linhas, com magnitude-alvo 4,0 |
 | Os 18 arquivos de `testes_upload/` | todos com o resultado esperado, rodados numa transação desfeita no fim para não gravar no banco |
+| Classificação da base em regiões (165 mil terremotos) | todos classificados em poucos minutos (o tempo é dominado pela gravação no SQLite); soma das regiões igual ao total |
+| Correção da Rússia e da Guiana Francesa | a Europa caiu de 7.664 para 2.310 terremotos e a Ásia subiu de 28.686 para 34.039 |
 
 ### O que grava no banco e o que não grava
 
 | Ação | Grava no banco? | O quê |
 |---|---|---|
 | `python manage.py migrate` | sim | cria as tabelas (sem dados) |
+| `python manage.py carregar_regioes` | **sim** | as regiões e a coluna `zona` de todos os terremotos |
 | `python manage.py importar_terremotos` | **sim** | terremotos (novos e atualizados) e uma coleta |
 | `python manage.py importar_terremotos --arquivo x.csv` | **sim** | terremotos do CSV e uma coleta |
 | `python manage.py baixar_csv` | não | só gera um CSV em `backend/data/` |
@@ -620,7 +722,9 @@ Além dos testes, estas verificações foram feitas com a base real durante o de
 | Arquivos de `data/testes_upload/` enviados à API | **sim** | terremotos com id `teste_...` e uma coleta por envio |
 | `GET` em qualquer endpoint | não | só leitura |
 | `POST`, `PUT`, `PATCH`, `DELETE /api/terremotos/` | **sim** | cria, altera ou apaga um terremoto |
-| `POST /api/coletas/` | **sim** | terremotos do USGS e uma coleta |
+| `POST /api/coletas/` | **sim** | terremotos do USGS (mundo inteiro) e uma coleta |
+| `POST /api/regioes/{codigo}/importar/` | **sim** | terremotos do USGS da região e uma coleta |
+| `GET /api/regioes/` e `/api/regioes/mapa/` | não | só leitura |
 | `POST /api/coletas/upload/` | **sim** | terremotos do CSV e uma coleta (também quando o CSV é rejeitado na leitura: a coleta fica com status `erro`) |
 | `POST /api/modelos/` | **sim** | um modelo treinado e o arquivo em `media/modelos/`; com `atualizar_dados: true`, também baixa e grava terremotos |
 | `POST /api/modelos/{id}/ativar/` | **sim** | marca o modelo como ativo |
@@ -646,26 +750,26 @@ Os dados vêm do **ANSS Comprehensive Earthquake Catalog (ComCat)**, mantido pel
 
 | Critério | Valor |
 |---|---|
-| Região | mundo inteiro |
+| Região | uma por vez: um continente ou oceano (as caixas de cada região são consultadas no USGS) |
 | Coordenadas | latitude de -90 a 90, longitude de -180 a 180 |
-| Magnitude | ≥ 2,5 |
+| Magnitude | na importação por região, ≥ magnitude de completude da região (padrão 4,0); em `POST /api/coletas/` e `importar_terremotos`, ≥ 2,5; configurável |
 | Período | últimos 3 anos, contados a partir da data da coleta |
 | Tipo de evento | apenas terremotos (`eventtype=earthquake`) |
 | Destino | banco da API (`backend/db.sqlite3`) |
 
-### Por que magnitude mínima de 2,5
+### Por que magnitude mínima de 4,0
 
-Sem filtro de magnitude, o catálogo tem cerca de **428 mil** terremotos no mundo em 3 anos. A maioria são microtremores registrados pela rede densa de sensores dos EUA, o que concentraria a base artificialmente nesse país e deixaria a importação e o treino muito mais lentos. Com magnitude ≥ 2,5, a base fica com cerca de **83 mil** eventos e ainda inclui tremores pequenos, que o modelo usa como sinal de atividade da região. Com magnitude ≥ 4, seriam cerca de 49 mil.
+Sem filtro de magnitude, o catálogo tem cerca de **428 mil** terremotos no mundo em 3 anos. A maioria são microtremores registrados pela rede densa de sensores dos EUA, o que concentraria a base artificialmente nesse país e deixaria a importação e o treino muito mais lentos. E o catálogo não é completo para magnitudes pequenas fora de poucos países. Medindo a magnitude de completude de cada região da base (o valor em que a contagem de eventos deixa de crescer), deu cerca de **4,1 a 4,5** em todas, menos na América do Norte (2,5, por causa da rede dos EUA). Por isso a magnitude de completude padrão é 4,0, e a importação por região baixa só o que o catálogo cobre bem. O padrão de 2,5 continua em `POST /api/coletas/`, nos comandos e no upload de CSV.
 
 ### Requisição utilizada
 
-Os dados são baixados em GeoJSON, porque é o formato que traz os campos de impacto (`tsunami`, `alert`, `sig`), ausentes no CSV da API. Exemplo de uma das requisições feitas pela coleta, para uma janela de um ano:
+Os dados são baixados em GeoJSON, porque é o formato que traz os campos de impacto (`tsunami`, `alert`, `sig`), ausentes no CSV da API. Exemplo de uma das requisições feitas pela coleta, para uma janela de um ano e a caixa principal da América do Sul:
 
 ```
-https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-29T00:00:00&endtime=2026-10-29T00:00:00&eventtype=earthquake&minlatitude=-90&maxlatitude=90&minlongitude=-180&maxlongitude=180&minmagnitude=2.5
+https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-29T00:00:00&endtime=2026-10-29T00:00:00&eventtype=earthquake&minlatitude=-57.61&maxlatitude=14.44&minlongitude=-83.41&maxlongitude=-32.73&minmagnitude=4
 ```
 
-A API do USGS devolve no máximo 20.000 eventos por consulta. Como um ano do mundo inteiro passa desse limite, a coleta confere o total pelo método `count` e divide a janela ao meio até cada parte caber numa consulta.
+A API do USGS devolve no máximo 20.000 eventos por consulta. Regiões grandes (América do Norte, Pacífico) passam desse limite em um ano, então a coleta confere o total pelo método `count` e divide a janela ao meio até cada parte caber numa consulta.
 
 ### Colunas do arquivo
 
@@ -724,22 +828,27 @@ Na etapa de tratamento, são criados a partir das colunas originais:
 | `data_hora` | `time` | data e hora convertidas para datetime UTC |
 | `ano`, `mes` | `time` | componentes de data para análises temporais |
 | `faixa_profundidade` | `depth` | raso (< 70 km), intermediário (70–300 km) ou profundo (> 300 km) |
+| `zona` | `latitude`, `longitude` | código da região (continente ou oceano) a que o terremoto pertence, calculado na importação |
 
 As faixas de profundidade seguem a classificação usual em sismologia.
 
-### Por que o mundo inteiro
+### Por que continentes e oceanos
 
-A pergunta do projeto é onde existe maior chance de um terremoto acima de uma magnitude. Restringir a base a um país deixaria de fora regiões muito ativas, como o Japão, a Indonésia e a costa do Pacífico das Américas. Com a base global, o modelo compara todas as zonas sísmicas entre si, e a análise visual mostra o Círculo de Fogo do Pacífico e as demais bordas de placas tectônicas.
+A pergunta do projeto é onde existe maior chance de um terremoto acima de uma magnitude. A análise de um mundo único mistura sobretudo geografia (onde ficam as bordas de placas) e a cobertura dos sensores, que varia muito entre países. Separar por continente e oceano dá regiões de tamanho comparável, cada uma com seus dados e gráficos. O mar conta: a maior parte dos terremotos fortes acontece nas fossas junto à costa, então o mar até uns 200 km pertence ao continente, e o mar aberto, ao oceano. Foram descartadas a divisão por país (o recorte retangular misturava vizinhos: a "Bolívia" listava terremotos do Chile e do Peru), por caixas de latitude e longitude (sobrepunham-se) e por placa tectônica.
 
 ---
 
 ## Limitações dos dados
 
-- **Escalas de magnitude diferentes.** A base mistura tremores pequenos, medidos em escalas locais como a `ml`, com eventos grandes, medidos pela magnitude de momento (`mww`). As escalas não são diretamente equivalentes, e o campo `magType` deve ser considerado nas análises.
-- **Completude desigual.** Tremores pequenos só são detectados perto das estações sismográficas, e a densidade de estações varia muito entre países. Mesmo com magnitude ≥ 2,5, regiões com redes densas (EUA, Japão) registram mais eventos pequenos que regiões remotas ou oceânicas. A ausência de eventos numa área pode refletir falta de cobertura, não falta de atividade.
-- **Campos de impacto quase vazios.** `felt`, `cdi`, `mmi` e `alert` só existem quando houve relatos da população ou avaliação de impacto, o que é raro em tremores pequenos.
+- **Escalas de magnitude diferentes.** A base mistura escalas: cerca de 54% dos eventos são `mb`, 30% `ml`, 9% `md` e 5% `mww`, entre outras. As escalas não são diretamente equivalentes, e o campo `magType` deve ser considerado nas análises.
+- **Completude desigual.** Tremores pequenos só são detectados perto das estações sismográficas. Na base, só a América do Norte é completa abaixo de M 4; nas demais regiões o catálogo só é completo a partir de uns M 4,1 a 4,5. Por isso a importação por região usa M ≥ 4,0, e uma base que misture a importação global antiga (M ≥ 2,5) com as novas deixa a América do Norte sobrerrepresentada. A ausência de eventos numa área pode refletir falta de cobertura, não falta de atividade.
+- **Profundidade de 10 km.** Cerca de 30% dos eventos (49 mil) têm profundidade exatamente 10 km, o valor-padrão que o USGS usa quando não consegue calcular a profundidade. Esse número distorce a profundidade média e as faixas de profundidade.
+- **Campos de impacto quase vazios.** `felt`, `cdi`, `mmi` e `alert` só existem quando houve relatos da população ou avaliação de impacto, o que é raro em tremores pequenos: `alert` está vazio em 97% dos eventos, `mmi` em 93% e `cdi` e `felt` em 84%.
 - **`tsunami` indica uma mensagem, não um tsunami.** O valor 1 significa que o USGS emitiu um aviso, segundo um protocolo baseado principalmente em magnitude e localização. Não confirma que uma onda ocorreu.
-- **Dados revisáveis.** Eventos recentes podem estar com `status=automatic` e ter localização ou magnitude ajustadas depois.
+- **Dados revisáveis.** Eventos recentes podem estar com `status=automatic` (0,6% da base) e ter localização ou magnitude ajustadas depois.
+- **Qualidade da localização.** Cerca de 24% dos eventos têm lacuna azimutal acima de 180°, o que indica uma localização menos confiável.
+- **Réplicas.** Os terremotos vêm em sequências (um grande seguido de réplicas). A base não é "declusterizada", então as réplicas inflam a persistência de atividade que o modelo aprende.
+- **Limites das regiões.** Os polígonos do Natural Earth são de baixa resolução (110 m), e a faixa de mar de uma região é aproximada (2° de latitude, cerca de 200 km, um pouco menos em longitude nas latitudes altas). Um terremoto na divisa entre dois continentes pode trocar de região se esses limites mudarem. Os polígonos dos oceanos são blocos retos e não cobrem os mares marginais: o que sobra vai para o oceano mais próximo.
 - **Células, não cidades.** O modelo trabalha com células de latitude e longitude. O nome de um lugar só aparece no campo `place` do USGS (ex.: "45 km E of Sendai, Japan"), que descreve a posição em relação à cidade mais próxima.
 - **Variáveis físicas ausentes.** O catálogo não traz o mecanismo de falha nem o deslocamento do fundo do mar.
 
@@ -750,4 +859,6 @@ A pergunta do projeto é onde existe maior chance de um terremoto acima de uma m
 - USGS FDSN Event Web Service: https://earthquake.usgs.gov/fdsnws/event/1/
 - Formato GeoJSON do USGS: https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php
 - Documentação do ComCat: https://earthquake.usgs.gov/data/comcat/
+- Natural Earth (polígonos de países e oceanos): https://www.naturalearthdata.com/
 - Documentação do Django REST Framework: https://www.django-rest-framework.org/
+- Shapely (geometria em Python): https://shapely.readthedocs.io/

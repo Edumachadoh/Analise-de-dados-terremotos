@@ -7,7 +7,7 @@ from pathlib import Path
 from django.conf import settings
 from rest_framework import serializers
 
-from .models import Coleta, ModeloTreinado, Terremoto
+from .models import Coleta, ModeloTreinado, Regiao, Terremoto
 from .services import ml
 
 
@@ -19,6 +19,26 @@ class TerremotoSerializer(serializers.ModelSerializer):
         model = Terremoto
         fields = "__all__"
         # Os validators de faixa (latitude entre -90 e 90 etc.) vêm do model
+
+
+class RegiaoSerializer(serializers.ModelSerializer):
+    """Um continente ou oceano. total_terremotos vem anotado pela view (eventos na base)."""
+    total_terremotos = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = Regiao
+        fields = ["codigo", "nome", "tipo", "ordem", "magnitude_completude", "total_terremotos"]
+        read_only_fields = fields
+
+
+class ImportacaoRegiaoSerializer(serializers.Serializer):
+    """Entrada de POST /api/regioes/{codigo}/importar/."""
+    anos = serializers.IntegerField(required=False, min_value=1, max_value=20,
+                                    default=settings.ANOS_COLETA_PADRAO)
+    magnitude_minima = serializers.FloatField(
+        required=False, allow_null=True, min_value=-2, max_value=10, default=None,
+        help_text="Padrão: a magnitude de completude da região",
+    )
 
 
 class ColetaSerializer(serializers.ModelSerializer):

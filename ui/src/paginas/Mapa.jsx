@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { CircleMarker, Tooltip } from 'react-leaflet'
 import { Aviso, Cabecalho, Carregando, Cartao, Seletor } from '../componentes/comuns.jsx'
-import { corDaRampa, limitesDe, MapaBase, RAMPA } from '../componentes/MapaBase.jsx'
+import { ajusteDeLongitude, corDaRampa, limitesDe, MapaBase, RAMPA } from '../componentes/MapaBase.jsx'
 import { amostrar, formatarData, formatarInteiro, formatarNumero } from '../lib/formato.js'
 import { rotulo } from '../lib/rotulos.js'
 import { useTodosTerremotos } from '../lib/useTodosTerremotos.js'
@@ -20,7 +20,8 @@ export default function Mapa({ filtros, versaoBase }) {
   const opcoes = [[NENHUM, '(nenhum)'], ...COLUNAS_NUMERICAS.map((c) => [c, rotulo(c)])]
 
   const { pontos, faixaCor, faixaTamanho } = useMemo(() => {
-    let lista = amostrar(dados ?? [], MAX_PONTOS)
+    const ajustar = ajusteDeLongitude((dados ?? []).map((d) => d.longitude))
+    let lista = amostrar(dados ?? [], MAX_PONTOS).map((p) => ({ ...p, longitude: ajustar(p.longitude) }))
     // os maiores por último, para ficarem por cima
     if (colTamanho) lista = [...lista].sort((a, b) => (a[colTamanho] ?? -Infinity) - (b[colTamanho] ?? -Infinity))
     const faixa = (col) => {
@@ -51,7 +52,7 @@ export default function Mapa({ filtros, versaoBase }) {
         <>
           <Cartao largo
             titulo={`${formatarInteiro(pontos.length)} terremotos no mapa`}
-            subtitulo={dados.length > MAX_PONTOS ? null : 'com os filtros aplicados'}
+            subtitulo={amostrado ? `amostra de ${formatarInteiro(dados.length)} terremotos` : 'com os filtros aplicados'}
             controles={<>
               <Seletor rotulo="Cor por" valor={colCor} opcoes={opcoes} aoMudar={setColCor} />
               <Seletor rotulo="Tamanho por" valor={colTamanho} opcoes={opcoes} aoMudar={setColTamanho} />

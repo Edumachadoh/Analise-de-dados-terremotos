@@ -43,8 +43,10 @@ def _get(metodo: str, params: dict) -> requests.Response:
         return resp
 
 
-def _params(inicio: datetime, fim: datetime, magnitude_minima: float | None) -> dict:
-    lat_min, lat_max, lon_min, lon_max = settings.REGIAO_ANALISE
+def _params(inicio: datetime, fim: datetime, magnitude_minima: float | None,
+            limites: tuple | None = None) -> dict:
+    # limites = uma caixa (lat_min, lat_max, lon_min, lon_max); sem ela, vale settings.REGIAO_ANALISE
+    lat_min, lat_max, lon_min, lon_max = limites or settings.REGIAO_ANALISE
     params = {
         "starttime": inicio.strftime("%Y-%m-%dT%H:%M:%S"),
         "endtime": fim.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -58,42 +60,45 @@ def _params(inicio: datetime, fim: datetime, magnitude_minima: float | None) -> 
     return params
 
 
-def contar(inicio, fim, magnitude_minima=None) -> int:
+def contar(inicio, fim, magnitude_minima=None, limites=None) -> int:
     """Quantos eventos a consulta devolveria, sem baixá-los."""
-    return int(_get("count", _params(inicio, fim, magnitude_minima)).text)
+    return int(_get("count", _params(inicio, fim, magnitude_minima, limites)).text)
 
 
-def _baixar_janela(inicio, fim, magnitude_minima) -> list[dict]:
+def _baixar_janela(inicio, fim, magnitude_minima, limites=None) -> list[dict]:
     """Baixa uma janela; se passar do limite da API, divide ao meio (recursão)."""
-    total = contar(inicio, fim, magnitude_minima)
+    total = contar(inicio, fim, magnitude_minima, limites)
     if total == 0:
         return []
     if total > LIMITE_API:
         meio = inicio + (fim - inicio) / 2
-        return (_baixar_janela(inicio, meio, magnitude_minima)
-                + _baixar_janela(meio, fim, magnitude_minima))
-    params = _params(inicio, fim, magnitude_minima) | {"format": "geojson"}
+        return (_baixar_janela(inicio, meio, magnitude_minima, limites)
+                + _baixar_janela(meio, fim, magnitude_minima, limites))
+    params = _params(inicio, fim, magnitude_minima, limites) | {"format": "geojson"}
     return _get("query", params).json()["features"]
 
 
-def buscar_terremotos(anos: int, magnitude_minima: float | None = None) -> list[dict]:
-    """Baixa os terremotos do mundo inteiro dos últimos `anos`."""
+def buscar_terremotos(anos: int, magnitude_minima: float | None = None,
+                      caixas: list | None = None) -> list[dict]:
+    """Baixa os terremotos dos últimos `anos`, no recorte padrão ou nas `caixas` dadas."""
     fim = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
-    return buscar_periodo(fim - timedelta(days=365 * anos), fim, magnitude_minima)
+    return buscar_periodo(fim - timedelta(days=365 * anos), fim, magnitude_minima, caixas)
 
 
-def buscar_periodo(inicio: datetime, fim: datetime,
-                   magnitude_minima: float | None = None) -> list[dict]:
+def buscar_periodo(inicio: datetime, fim: datetime, magnitude_minima: float | None = None,
+                   caixas: list | None = None) -> list[dict]:
     """
     Baixa os terremotos entre `inicio` e `fim` (UTC, sem fuso), em janelas de um ano.
+    Sem `caixas`, usa o recorte padrão; com elas, consulta uma por vez.
     Devolve a lista de features GeoJSON, sem duplicatas.
     """
     features = []
-    janela = inicio
-    while janela < fim:
-        janela_fim = min(janela + timedelta(days=365), fim)
-        features += _baixar_janela(janela, janela_fim, magnitude_minima)
-        janela = janela_fim
+    for limites in caixas or [None]:
+        janela = inicio
+        while janela < fim:
+            janela_fim = min(janela + timedelta(days=365), fim)
+            features += _baixar_janela(janela, janela_fim, magnitude_minima, limites)
+            janela = janela_fim
 
-    # um evento na borda entre duas janelas pode vir duas vezes
+    # um evento na borda entre duas janelas (ou entre duas caixas) pode vir duas vezes
     return list({f["id"]: f for f in features}.values())

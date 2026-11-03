@@ -519,7 +519,6 @@ td.num {
   height: max(360px, calc(100vh - 340px));
 }
 
-/* Aviso fixo abaixo do mapa quando só uma amostra dos pontos é desenhada */
 .nota-mapa {
   margin: 0 0 10px;
   padding: 8px 12px;
@@ -715,20 +714,251 @@ td.num {
   color: var(--texto-2);
 }
 
-.conclusao {
-  margin: 12px 0 0;
-  padding: 8px 12px;
-  border-left: 3px solid var(--serie-1);
-  background: var(--superficie-2);
-  border-radius: 0 8px 8px 0;
-  font-size: 13px;
+.escala-correlacao {
+  margin-top: 14px;
+  max-width: 560px;
+  font-size: 12px;
+  color: var(--texto-2);
+}
+
+.escala-correlacao .barra {
+  height: 14px;
+  border-radius: 7px;
+}
+
+.escala-correlacao .marcas {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.escala-correlacao .marcas span:nth-child(2) {
+  text-align: center;
+}
+
+.escala-correlacao .marcas span:last-child {
+  text-align: right;
+}
+
+.escala-correlacao p {
+  margin: 10px 0 0;
   line-height: 1.5;
+}
+
+/* Filtro de período: um campo por linha, para a data não ser cortada */
+.subcampo {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Passo a passo e tabela do gráfico de persistência */
+.passos {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--texto-2);
+}
+
+.passos strong {
   color: var(--texto);
 }
 
-.ponte-ml {
-  margin: 0;
-  padding-left: 20px;
+/* ------------------------------------------------------------ escolha da região */
+
+.regioes {
+  display: grid;
+  gap: 16px;
+}
+
+.opcoes-regiao {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.grupo-regioes {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-mudo);
+}
+
+.grupo-regioes:first-child {
+  margin-top: 0;
+}
+
+/* uma região por linha: nome à esquerda, quantidade de terremotos à direita */
+.opcao-regiao {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 8px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcao-regiao span {
+  font-size: 12px;
+  color: var(--texto-mudo);
+}
+
+.opcao-regiao:hover {
+  background: var(--superficie-2);
+}
+
+.opcao-regiao.ativo {
+  border-color: var(--destaque);
+  background: var(--superficie-2);
+}
+
+/* mapa à esquerda; painel da região e lista à direita, sempre à vista ao rolar */
+.regioes-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: stretch; /* o painel lateral tem a mesma altura do cartão do mapa */
+}
+
+.regioes-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* o cartão da lista ocupa o que sobra, até a base do cartão do mapa */
+.regioes-lateral > .cartao:last-child {
+  flex: 1;
+}
+
+@media (max-width: 1280px) {
+  .regioes-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .regioes-lateral > .cartao:last-child {
+    flex: none;
+  }
+
+}
+
+.regiao-atual {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--texto-2);
+}
+
+.regiao-atual strong {
+  font-size: 16px;
+  color: var(--texto);
+}
+
+.subtitulo-secao {
+  margin: 16px 0 6px;
   font-size: 14px;
-  line-height: 1.7;
+}
+
+/* O mapa cabe inteiro na janela, de 72°S a 80°N (com a Antártida): a altura é a que sobra abaixo do cabeçalho e a
+   largura acompanha a proporção do mundo. Em janela mais baixa ele fica menor, mas sempre aparece por inteiro. */
+.mapa-regioes {
+  height: max(calc(100vh - 250px), 320px);
+  max-height: 820px;
+  aspect-ratio: 1.46;
+  width: auto;
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--plano);
+}
+
+.mapa-regioes .leaflet-container {
+  font: inherit;
+  background: var(--plano);
+}
+
+/* nome da região escrito sobre o mapa */
+.leaflet-tooltip.rotulo-regiao {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1c1c1c;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  pointer-events: none;
+}
+
+.leaflet-tooltip.rotulo-regiao::before {
+  display: none;
+}
+
+/* no layout com painel lateral, o mapa ocupa só a primeira coluna */
+.regioes-layout .cartao.largo {
+  grid-column: auto;
+}
+
+/* em tela estreita o painel fica abaixo do mapa e o mapa usa a largura toda, na proporção do mundo */
+@media (max-width: 1280px) {
+  .mapa-regioes {
+    height: auto;
+    max-height: none;
+    width: 100%;
+  }
+}
+
+/* painel da região: importação recolhida e mais compacto */
+.importacao-regiao {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.importacao-regiao summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--texto-2);
+}
+
+.importacao-regiao[open] summary {
+  margin-bottom: 6px;
+}
+
+.regioes-lateral .cartao {
+  padding: 12px 14px;
+}
+
+.regioes-lateral .grupo-regioes {
+  margin: 8px 0 4px;
+}
+
+/* janela baixa (menos de 820 px): painel lateral mais compacto, para a página não precisar rolar */
+@media (max-height: 820px) and (min-width: 1281px) {
+  .importacao-regiao .texto-explicacao {
+    display: none;
+  }
+
+  .opcao-regiao {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
 }

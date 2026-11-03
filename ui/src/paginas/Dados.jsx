@@ -9,8 +9,7 @@ import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
 const TAMANHO_PAGINA = 50 // o mesmo PAGE_SIZE do back
-// O back (rota /coletas/upload/) lê só CSV; a fonte USGS, que roda no navegador, lê os três formatos
-const FORMATOS_ACEITOS = api.local ? '.csv,.json,.xml' : '.csv'
+const FORMATOS_ACEITOS = '.csv' // a rota /coletas/upload/ do back lê só CSV
 
 // Colunas da tabela. `ordena` é o campo aceito em ?ordering= (o back só ordena por estes três).
 const COLUNAS = [
@@ -31,7 +30,7 @@ const COLUNAS = [
   { campo: 'usgs_id' },
 ]
 
-export default function Dados({ filtros, versaoBase, aoMudarBase }) {
+export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
   const [pagina, setPagina] = useState(1)
   const [ordenacao, setOrdenacao] = useState('-data_hora')
   const [filtrosVistos, setFiltrosVistos] = useState(filtros)
@@ -55,9 +54,9 @@ export default function Dados({ filtros, versaoBase, aoMudarBase }) {
 
   return (
     <>
-      <Cabecalho titulo="Dados">Tabela completa dos terremotos, com os filtros da barra lateral, e importação de dados novos</Cabecalho>
+      <Cabecalho titulo={`Dados · ${regiao.nome}`}>Tabela completa dos terremotos da região, com os filtros da barra lateral, e importação de dados novos</Cabecalho>
 
-      <Importacao aoImportar={aoMudarBase} />
+      <Importacao regiao={regiao} aoImportar={aoMudarBase} />
 
       <div className="grade-cartoes">
         <Cartao largo titulo="Terremotos" subtitulo={`${formatarInteiro(total)} registros · clique no título de uma coluna com seta para ordenar`}>
@@ -135,7 +134,7 @@ export default function Dados({ filtros, versaoBase, aoMudarBase }) {
   )
 }
 
-function Importacao({ aoImportar }) {
+function Importacao({ regiao, aoImportar }) {
   const entrada = useRef(null)
   const [arrastando, setArrastando] = useState(false)
   const [anos, setAnos] = useState(3)
@@ -161,7 +160,7 @@ function Importacao({ aoImportar }) {
 
   return (
     <div className="grade-cartoes">
-      <Cartao titulo="Buscar dados no USGS" subtitulo="Baixa os terremotos do mundo inteiro dos últimos anos; os que já existem são atualizados, não duplicados">
+      <Cartao titulo="Buscar dados no USGS" subtitulo={`Baixa os terremotos de ${regiao.nome} dos últimos anos; os que já existem são atualizados, não duplicados`}>
         <div className="formulario-linha">
           <label className="campo">
             Últimos (anos)
@@ -169,17 +168,17 @@ function Importacao({ aoImportar }) {
           </label>
           <label className="campo">
             Magnitude mínima
-            <input type="number" step="0.1" min="-2" max="10" placeholder="todas" value={magMinima} onChange={(e) => setMagMinima(e.target.value)} />
+            <input type="number" step="0.1" min="-2" max="10" placeholder={String(regiao.magnitude_completude)} value={magMinima} onChange={(e) => setMagMinima(e.target.value)} />
           </label>
           <button className="botao primario" disabled={!!ocupado}
-            onClick={() => executar('Buscando no USGS… pode levar alguns minutos', () => api.importarDoUsgs(Number(anos), magMinima === '' ? null : Number(magMinima)))}>
+            onClick={() => executar('Buscando no USGS… pode levar alguns minutos', () => api.importarRegiao(regiao.codigo, Number(anos), magMinima === '' ? null : Number(magMinima)))}>
             Buscar no USGS
           </button>
         </div>
         {ocupado?.startsWith('Buscando') && <p className="texto-explicacao">{ocupado}</p>}
       </Cartao>
 
-      <Cartao titulo="Enviar um arquivo" subtitulo={`${api.local ? 'CSV, JSON (inclusive GeoJSON) ou XML' : 'CSV'} com as colunas do USGS: id, mag, time, latitude, longitude e depth`}>
+      <Cartao titulo="Enviar um arquivo" subtitulo="CSV com as colunas do USGS: id, mag, time, latitude, longitude e depth">
         <div
           className={`upload${arrastando ? ' arrastando' : ''}`}
           onClick={() => entrada.current.click()}
@@ -199,7 +198,7 @@ function Importacao({ aoImportar }) {
         >
           <Icone nome="upload" tamanho={26} />
           <strong>{ocupado?.startsWith('Enviando') ? ocupado : 'Arraste um arquivo aqui ou clique para escolher'}</strong>
-          <span>Os terremotos do arquivo são somados à base</span>
+          <span>Os terremotos do arquivo são somados à base; cada região mostra os que pertencem a ela</span>
           <input ref={entrada} type="file" accept={FORMATOS_ACEITOS} hidden
             onChange={(e) => {
               enviar(e.target.files[0])

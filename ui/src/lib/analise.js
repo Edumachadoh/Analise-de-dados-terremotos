@@ -2,51 +2,29 @@
 // justifica uma escolha do modelo (backend/api/services/ml.py): células de 1° × 1°, períodos de
 // 30 dias contados para trás a partir do último terremoto e alvo "houve terremoto forte na região".
 
-// Abaixo desta magnitude o catálogo do USGS só é completo em alguns países, então as contagens
-// comparam apenas terremotos de 4,5 ou mais.
-export const MAG_COMPLETA = 4.5
-
 const DIA_MS = 24 * 60 * 60 * 1000
 const PERIODO_DIAS = 30
 
 const celulaDe = (t) => `${Math.floor(t.latitude)},${Math.floor(t.longitude)}`
-
-export function soCompletos(terremotos) {
-  return terremotos.filter((t) => t.magnitude != null && t.magnitude >= MAG_COMPLETA && t.latitude != null && t.longitude != null)
-}
+const comPosicao = (terremotos) => terremotos.filter((t) => t.magnitude != null && t.latitude != null && t.longitude != null)
 
 // Lei de Gutenberg-Richter: quantos terremotos têm magnitude maior ou igual a cada valor
 export function raridadePorMagnitude(terremotos) {
-  const lista = soCompletos(terremotos)
+  const magnitudes = terremotos.map((t) => t.magnitude).filter((m) => m != null)
+  if (!magnitudes.length) return []
+  const minima = Math.floor(magnitudes.reduce((a, m) => Math.min(a, m), Infinity) * 2) / 2
   const limites = []
-  for (let m = MAG_COMPLETA; m <= 8; m += 0.5) {
-    const total = lista.filter((t) => t.magnitude >= m).length
+  for (let m = minima; m <= 8; m += 0.5) {
+    const total = magnitudes.reduce((n, v) => n + (v >= m ? 1 : 0), 0)
     if (total > 0) limites.push({ limite: m, total })
   }
   return limites
 }
 
-// Quanto dos terremotos cabe nas regiões (células) mais ativas
-export function concentracaoPorRegiao(terremotos, fracoes = [0.01, 0.05, 0.1, 0.25, 0.5]) {
-  const lista = soCompletos(terremotos)
-  const porCelula = new Map()
-  for (const t of lista) porCelula.set(celulaDe(t), (porCelula.get(celulaDe(t)) ?? 0) + 1)
-  const contagens = [...porCelula.values()].sort((a, b) => b - a)
-  const regioes = contagens.length
-  if (!regioes) return { regioes: 0, total: 0, pontos: [] }
-
-  const pontos = fracoes.map((f) => {
-    const n = Math.max(1, Math.round(regioes * f))
-    const eventos = contagens.slice(0, n).reduce((s, v) => s + v, 0)
-    return { fracao: f, regioes: n, parcela: eventos / lista.length }
-  })
-  return { regioes, total: lista.length, pontos }
-}
-
 // Uma região onde houve terremoto no mês anterior tem mais chance de ter um forte no mês seguinte?
 // Para cada limite de magnitude, compara a chance (a) depois de um mês ativo e (b) depois de um mês sem nada.
 export function persistenciaMensal(terremotos, limites = [4.5, 5, 6]) {
-  const lista = soCompletos(terremotos)
+  const lista = comPosicao(terremotos)
   if (!lista.length) return []
 
   let fim = -Infinity
@@ -69,6 +47,7 @@ export function persistenciaMensal(terremotos, limites = [4.5, 5, 6]) {
     porPeriodo.set(p, Math.max(porPeriodo.get(p) ?? -Infinity, t.magnitude))
   }
 
+  const regioes = celulas.size
   return limites.map((limite) => {
     const ativa = { casos: 0, fortes: 0 }
     const inativa = { casos: 0, fortes: 0 }
@@ -85,20 +64,15 @@ export function persistenciaMensal(terremotos, limites = [4.5, 5, 6]) {
     const depoisDeInativa = chance(inativa)
     return {
       limite,
+      regioes,
+      periodos,
       depoisDeAtiva,
       depoisDeInativa,
       vezes: depoisDeAtiva != null && depoisDeInativa ? depoisDeAtiva / depoisDeInativa : null,
       casosAtiva: ativa.casos,
+      fortesAtiva: ativa.fortes,
       casosInativa: inativa.casos,
+      fortesInativa: inativa.fortes,
     }
   })
-}
-
-// Sobre a série mensal: média, mês mais ativo e quantas vezes ele supera a média
-export function resumoMensal(meses) {
-  if (!meses?.length) return null
-  const total = meses.reduce((s, m) => s + m.total, 0)
-  const media = total / meses.length
-  const pico = meses.reduce((a, m) => (m.total > a.total ? m : a), meses[0])
-  return { media, pico, vezes: media ? pico.total / media : null, meses: meses.length }
 }

@@ -185,10 +185,18 @@ export function MatrizCorrelacao({ colunas, valores }) {
           </Fragment>
         ))}
       </div>
-      <div className="legenda">
-        <span className="item"><span className="amostra" style={{ background: fundo(0.8) }} />positiva: sobem juntas</span>
-        <span className="item"><span className="amostra" style={{ background: fundo(-0.8) }} />negativa: uma sobe, a outra desce</span>
-        <span>· próximo de 0: sem relação · de ±0,3 a ±0,7: moderada · acima de ±0,7: forte</span>
+      <div className="escala-correlacao">
+        <div className="barra" style={{ background: `linear-gradient(to right, ${fundo(-1)}, var(--superficie-2) 50%, ${fundo(1)})` }} />
+        <div className="marcas">
+          <span>-1<br />uma sobe, a outra desce</span>
+          <span>0<br />não há relação</span>
+          <span>+1<br />sobem juntas</span>
+        </div>
+        <p>
+          Cada quadrado cruza duas medidas. Quanto mais forte a cor, mais as duas andam juntas (azul) ou em sentidos opostos (laranja).
+          Valores entre -0,3 e 0,3 são relação fraca, de 0,3 a 0,7 moderada e acima de 0,7 forte.
+          Correlação não prova que uma medida causa a outra.
+        </p>
       </div>
     </>
   )
