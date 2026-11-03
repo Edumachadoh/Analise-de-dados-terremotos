@@ -192,11 +192,7 @@ export function MatrizCorrelacao({ colunas, valores }) {
           <span>0<br />não há relação</span>
           <span>+1<br />sobem juntas</span>
         </div>
-        <p>
-          Cada quadrado cruza duas medidas. Quanto mais forte a cor, mais as duas andam juntas (azul) ou em sentidos opostos (laranja).
-          Valores entre -0,3 e 0,3 são relação fraca, de 0,3 a 0,7 moderada e acima de 0,7 forte.
-          Correlação não prova que uma medida causa a outra.
-        </p>
+        <p>Fraca: -0,3 a 0,3 · moderada: 0,3 a 0,7 · forte: acima de 0,7 (em módulo)</p>
       </div>
     </>
   )

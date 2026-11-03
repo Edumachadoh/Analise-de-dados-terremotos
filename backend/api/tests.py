@@ -18,7 +18,7 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import Coleta, ModeloTreinado, Regiao, Terremoto
-from .services import importacao, ml, zonas
+from .services import estatisticas, importacao, ml, zonas
 from .services.usgs import ErroUSGS
 
 AGORA = datetime(2026, 10, 1, tzinfo=timezone.utc)
@@ -241,6 +241,29 @@ class EstatisticaTests(TestCase):
     def test_por_mes(self):
         meses = self.cliente.get("/api/estatisticas/por-mes/").json()
         self.assertEqual([m["mes"] for m in meses], ["2026-08", "2026-10"])
+
+    def test_analises_do_ml_sem_dados_suficientes(self):
+        self.assertEqual(self.cliente.get("/api/estatisticas/janelas/").json(), [])
+        self.assertEqual(self.cliente.get("/api/estatisticas/casos-positivos/").json(), [])
+
+
+class AnalisesDoMlTests(TestCase):
+    def setUp(self):
+        self.cliente = APIClient()
+        criar_base_sintetica()
+
+    def test_janelas(self):
+        janelas = {j["feature"]: j["auc"] for j in self.cliente.get("/api/estatisticas/janelas/").json()}
+        self.assertEqual(list(janelas), estatisticas.JANELAS)
+        self.assertTrue(all(0 <= auc <= 1 for auc in janelas.values()))
+
+    def test_casos_positivos_bate_com_a_tabela_do_ml(self):
+        linhas = self.cliente.get("/api/estatisticas/casos-positivos/").json()
+        self.assertEqual(len(linhas), len(estatisticas.TAMANHOS_CELULA) * len(estatisticas.ALVOS))
+        um_grau = next(l for l in linhas if l["tamanho_celula"] == 1.0 and l["magnitude_alvo"] == 4.5)
+        painel, _ = ml.montar_painel(ml._dataframe(Terremoto.objects.all()), 4.5, 1.0)
+        self.assertEqual(um_grau["linhas"], len(painel))
+        self.assertEqual(um_grau["positivos"], int(painel["alvo"].sum()))
 
 
 class ImportacaoTests(TestCase):

@@ -3,7 +3,6 @@ import { Icone } from './componentes/comuns.jsx'
 import { esquecerTerremotos } from './lib/useTodosTerremotos.js'
 import { Filtros, FILTROS_VAZIOS } from './componentes/Filtros.jsx'
 import Dados from './paginas/Dados.jsx'
-import Mapa from './paginas/Mapa.jsx'
 import Modelos from './paginas/Modelos.jsx'
 import Painel from './paginas/Painel.jsx'
 import Previsoes from './paginas/Previsoes.jsx'
@@ -13,7 +12,6 @@ const PAGINAS = [
   { id: 'regioes', nome: 'Regiões', icone: 'globo' },
   // as telas abaixo analisam a região escolhida, então só aparecem depois da escolha
   { id: 'painel', nome: 'Painel', icone: 'painel', filtros: true, precisaRegiao: true },
-  { id: 'mapa', nome: 'Mapa', icone: 'mapa', filtros: true, precisaRegiao: true },
   { id: 'dados', nome: 'Dados', icone: 'dados', filtros: true, precisaRegiao: true },
   // { id: 'modelos', nome: 'Modelos', icone: 'modelos' },
   // { id: 'previsoes', nome: 'Previsões', icone: 'previsoes' },
@@ -23,7 +21,7 @@ export default function App() {
   const [pagina, setPagina] = useState('regioes')
   // O continente ou oceano em análise (objeto de /api/regioes/); todas as consultas levam o código dele
   const [regiao, setRegiao] = useState(null)
-  // Os filtros valem para Painel, Mapa e Dados ao mesmo tempo
+  // Os filtros valem para Painel e Dados ao mesmo tempo
   const [filtros, setFiltros] = useState(FILTROS_VAZIOS)
   // Muda quando a base muda (importação), para as telas buscarem os dados de novo
   const [versaoBase, setVersaoBase] = useState(0)
@@ -76,8 +74,7 @@ export default function App() {
 
       <main className="conteudo">
         {pagina === 'regioes' && <Regioes regiaoAtual={regiao} versaoBase={versaoBase} aoAnalisar={analisar} aoMudarBase={aoMudarBase} />}
-        {regiao && pagina === 'painel' && <Painel filtros={filtrosDaApi} versaoBase={versaoBase} />}
-        {regiao && pagina === 'mapa' && <Mapa filtros={filtrosDaApi} versaoBase={versaoBase} />}
+        {regiao && pagina === 'painel' && <Painel filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} />}
         {regiao && pagina === 'dados' && <Dados filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} aoMudarBase={aoMudarBase} />}
         {/* {pagina === 'modelos' && <Modelos aoMudarBase={aoMudarBase} />}
         {pagina === 'previsoes' && <Previsoes versaoBase={versaoBase} />} */}

@@ -50,7 +50,7 @@ export function consulta(filtros = {}, extras = {}) {
   return texto ? `?${texto}` : ''
 }
 
-export const apiReal = {
+export const apiTerremoto = {
   // ---------------------------------------------------------------- regiões (continentes e oceanos)
   // total_terremotos = quantos eventos da base pertencem à região (0 = ainda não importada)
   listarRegioes: () => requisitar('/regioes/'),
@@ -71,6 +71,9 @@ export const apiReal = {
   porMes: (filtros) => requisitar(`/estatisticas/por-mes/${consulta(filtros)}`),
   porMagnitude: (filtros) => requisitar(`/estatisticas/por-magnitude/${consulta(filtros)}`),
   porProfundidade: (filtros) => requisitar(`/estatisticas/por-profundidade/${consulta(filtros)}`),
+  // Análises que decidem as escolhas do ML: AUC de cada feature de histórico e casos positivos por alvo e célula
+  janelas: (filtros) => requisitar(`/estatisticas/janelas/${consulta(filtros)}`),
+  casosPositivos: (filtros) => requisitar(`/estatisticas/casos-positivos/${consulta(filtros)}`),
 
   // ---------------------------------------------------------------- coletas
   listarColetas: () => requisitar('/coletas/'),

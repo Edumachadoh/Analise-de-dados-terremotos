@@ -203,6 +203,11 @@ select {
   align-items: center;
 }
 
+.alternar {
+  display: flex;
+  gap: 4px;
+}
+
 .metricas {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -921,6 +926,40 @@ td.num {
     max-height: none;
     width: 100%;
   }
+}
+
+/* bolha de um grupo de terremotos no mapa (leaflet.markercluster) */
+.grupo-mapa span {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* gráficos do Painel que ficam recolhidos */
+.mais-graficos {
+  grid-column: 1 / -1;
+}
+
+.mais-graficos summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--texto-2);
+  padding: 8px 0;
+}
+
+.mais-graficos[open] summary {
+  margin-bottom: 8px;
+}
+
+/* tabela de casos positivos: a configuração atual do modelo em destaque */
+td.atual {
+  font-weight: 600;
+  color: var(--destaque);
 }
 
 /* painel da região: importação recolhida e mais compacto */

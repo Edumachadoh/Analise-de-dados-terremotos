@@ -135,6 +135,16 @@ class EstatisticaViewSet(viewsets.ViewSet):
         """Quantidade e magnitude média por faixa de profundidade."""
         return Response(estatisticas.por_faixa_profundidade(self._queryset(request)))
 
+    @action(detail=False, url_path="janelas")
+    def janelas(self, request):
+        """AUC de cada feature de histórico do ML (alvo M >= 4,5, células de 1°)."""
+        return Response(estatisticas.poder_das_janelas(self._queryset(request)))
+
+    @action(detail=False, url_path="casos-positivos")
+    def casos_positivos(self, request):
+        """Fração de célula x período com terremoto >= alvo, por alvo e tamanho de célula."""
+        return Response(estatisticas.casos_positivos(self._queryset(request)))
+
 
 class ColetaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
                     mixins.CreateModelMixin, viewsets.GenericViewSet):

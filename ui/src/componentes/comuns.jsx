@@ -24,14 +24,14 @@ export function Cartao({ titulo, subtitulo, controles, largo = false, children }
   )
 }
 
-// Título de uma etapa da análise, com a pergunta que ela responde
+// Título de uma etapa da análise
 export function Etapa({ numero, titulo, pergunta }) {
   return (
     <div className="etapa">
       <span className="numero">{numero}</span>
       <div>
         <h2>{titulo}</h2>
-        <p>{pergunta}</p>
+        {pergunta && <p>{pergunta}</p>}
       </div>
     </div>
   )

@@ -88,7 +88,7 @@ export function Filtros({ filtros, aoAplicar }) {
 
       <div className="par">
         <label className="campo">
-          Alerta de tsunami
+          Mensagem de tsunami
           <select value={rascunho.tsunami} onChange={mudar('tsunami')}>
             <option value="">Todos</option>
             <option value="true">Sim</option>

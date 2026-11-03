@@ -7,8 +7,10 @@ prontos para gráficos: o agrupamento é feito em SQL, não em Python.
 
 from django.db.models import Avg, Case, CharField, Count, Max, Min, Q, Value, When
 from django.db.models.functions import TruncMonth
+from sklearn.metrics import roc_auc_score
 
 from ..models import Terremoto
+from . import ml
 
 FAIXAS_MAGNITUDE = [
     ("menor que 3", Q(magnitude__lt=3)),
@@ -81,3 +83,53 @@ def por_faixa_profundidade(queryset) -> list[dict]:
              "total": por_nome.get(nome, {}).get("total", 0),
              "magnitude_media": _arredondar(por_nome.get(nome, {}).get("magnitude_media"))}
             for nome in ("raso", "intermediario", "profundo")]
+
+
+# =============================================================================
+# Análises que decidem as escolhas do ML (usam a mesma tabela célula x período)
+# =============================================================================
+JANELAS = ["eventos_periodo_anterior", "eventos_3_periodos", "eventos_12_periodos",
+           "taxa_historica", "atividade_geral_3_periodos"]
+TAMANHOS_CELULA = [0.5, 1.0, 2.0]
+ALVOS = [4.5, 5.0, 6.0]
+
+
+def poder_das_janelas(queryset, magnitude_alvo=4.5, tamanho_celula=1.0) -> list[dict]:
+    """
+    AUC de cada feature de histórico sozinha, para prever terremoto >= alvo no período
+    seguinte (0,5 = chute, 1 = perfeito).
+    """
+    try:
+        painel, _ = ml.montar_painel(ml._dataframe(queryset), magnitude_alvo, tamanho_celula)
+    except ml.ErroModelo:
+        return []
+    if painel["alvo"].nunique() < 2:
+        return []
+    return [{"feature": f, "auc": round(float(roc_auc_score(painel["alvo"], painel[f])), 3)}
+            for f in JANELAS]
+
+
+def casos_positivos(queryset) -> list[dict]:
+    """
+    Linhas da tabela do ML (célula x período) e quantas têm terremoto >= alvo,
+    para cada tamanho de célula e magnitude-alvo.
+    """
+    try:
+        df = ml._dataframe(queryset)
+    except ml.ErroModelo:
+        return []
+    resultado = []
+    for tamanho in TAMANHOS_CELULA:
+        try:
+            eventos, n_periodos, _ = ml.celulas_e_periodos(df, tamanho)
+        except ml.ErroModelo:
+            return []
+        celulas = len(eventos[["cel_lat", "cel_lon"]].drop_duplicates())
+        linhas = celulas * (n_periodos - 1)  # o período 0 não tem passado e sai da tabela
+        com_passado = eventos[eventos["periodo"] > 0]
+        for alvo in ALVOS:
+            positivos = len(com_passado.loc[com_passado["magnitude"] >= alvo,
+                                            ["cel_lat", "cel_lon", "periodo"]].drop_duplicates())
+            resultado.append({"tamanho_celula": tamanho, "magnitude_alvo": alvo, "linhas": linhas,
+                              "positivos": positivos, "taxa": round(positivos / linhas, 4)})
+    return resultado
