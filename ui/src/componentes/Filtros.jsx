@@ -5,10 +5,15 @@
 import { useState } from 'react'
 
 // Valores que a API aceita em cada filtro, exatamente como vêm nos dados
+// [valor enviado, texto mostrado]
 const VALORES = {
-  faixa_profundidade: ['raso', 'intermediario', 'profundo'],
-  tipo_magnitude: ['mb', 'ml', 'md', 'ms', 'mw', 'mww', 'mwr', 'mwc', 'mwb', 'mh'],
-  alerta: ['green', 'yellow', 'orange', 'red'],
+  faixa_profundidade: [['raso', 'Rasa (até 70 km)'], ['intermediario', 'Intermediária (70 a 300 km)'], ['profundo', 'Profunda (mais de 300 km)']],
+  tipo_magnitude: [
+    ['mb', 'mb · ondas de corpo'], ['ml', 'ml · local'], ['md', 'md · duração'], ['ms', 'ms · ondas superficiais'],
+    ['mw', 'mw · momento'], ['mww', 'mww · momento (onda W)'], ['mwr', 'mwr · momento regional'],
+    ['mwc', 'mwc · momento centroide'], ['mwb', 'mwb · momento (ondas de corpo)'], ['mh', 'mh · determinada à mão'],
+  ],
+  alerta: [['green', 'Verde'], ['yellow', 'Amarelo'], ['orange', 'Laranja'], ['red', 'Vermelho']],
 }
 
 export const FILTROS_VAZIOS = {
@@ -25,7 +30,14 @@ export const FILTROS_VAZIOS = {
   local: '',
 }
 
-export const quantosFiltros = (filtros) => Object.values(filtros).filter((v) => v !== '').length
+// A região escolhida (regiao) não conta: não é um filtro da barra lateral
+// Magnitude mínima nunca abaixo do corte de completude; se o filtro pedir mais, vale o filtro
+export function comCorte(filtros, corte) {
+  const minimo = filtros.magnitude_min === '' ? -Infinity : Number(filtros.magnitude_min)
+  return minimo >= corte ? filtros : { ...filtros, magnitude_min: corte }
+}
+
+export const quantosFiltros = ({ regiao, ...filtros }) => Object.values(filtros).filter((v) => v !== '').length
 
 export function Filtros({ filtros, aoAplicar }) {
   const [rascunho, setRascunho] = useState(filtros)
@@ -37,7 +49,7 @@ export function Filtros({ filtros, aoAplicar }) {
   const opcoes = (campo, todos) => (
     <select value={rascunho[campo]} onChange={mudar(campo)}>
       <option value="">{todos}</option>
-      {VALORES[campo].map((valor) => <option key={valor} value={valor}>{valor}</option>)}
+      {VALORES[campo].map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
     </select>
   )
 
@@ -49,12 +61,12 @@ export function Filtros({ filtros, aoAplicar }) {
       <h3>Filtros</h3>
 
       <label className="campo">
-        Magnitude
+        Magnitude (mínima e máxima)
         <div className="par">{numero('magnitude_min', 'mín.', 0.1)}{numero('magnitude_max', 'máx.', 0.1)}</div>
       </label>
 
       <label className="campo">
-        Profundidade (km)
+        Profundidade em km (mínima e máxima)
         <div className="par">{numero('profundidade_min', 'mín.', 1)}{numero('profundidade_max', 'máx.', 1)}</div>
       </label>
 
@@ -63,13 +75,17 @@ export function Filtros({ filtros, aoAplicar }) {
         {opcoes('faixa_profundidade', 'Todas')}
       </label>
 
-      <label className="campo">
+      <div className="campo">
         Período
-        <div className="par">
-          <input type="date" aria-label="início" value={rascunho.data_inicio} onChange={mudar('data_inicio')} />
-          <input type="date" aria-label="fim" value={rascunho.data_fim} onChange={mudar('data_fim')} />
-        </div>
-      </label>
+        <label className="subcampo">
+          De
+          <input type="date" value={rascunho.data_inicio} onChange={mudar('data_inicio')} />
+        </label>
+        <label className="subcampo">
+          Até
+          <input type="date" value={rascunho.data_fim} onChange={mudar('data_fim')} />
+        </label>
+      </div>
 
       <label className="campo">
         Escala de magnitude
@@ -78,7 +94,7 @@ export function Filtros({ filtros, aoAplicar }) {
 
       <div className="par">
         <label className="campo">
-          Tsunami
+          Mensagem de tsunami
           <select value={rascunho.tsunami} onChange={mudar('tsunami')}>
             <option value="">Todos</option>
             <option value="true">Sim</option>
@@ -86,13 +102,13 @@ export function Filtros({ filtros, aoAplicar }) {
           </select>
         </label>
         <label className="campo">
-          Alerta
+          Nível de alerta
           {opcoes('alerta', 'Todos')}
         </label>
       </div>
 
       <label className="campo">
-        Local contém
+        Local contém o texto
         <input type="text" placeholder="ex.: Valparaíso" value={rascunho.local} onChange={mudar('local')} />
       </label>
 

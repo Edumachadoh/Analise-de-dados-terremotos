@@ -24,6 +24,19 @@ export function Cartao({ titulo, subtitulo, controles, largo = false, children }
   )
 }
 
+// Título de uma etapa da análise
+export function Etapa({ numero, titulo, pergunta }) {
+  return (
+    <div className="etapa">
+      <span className="numero">{numero}</span>
+      <div>
+        <h2>{titulo}</h2>
+        {pergunta && <p>{pergunta}</p>}
+      </div>
+    </div>
+  )
+}
+
 export function Metrica({ rotulo, valor, detalhe }) {
   return (
     <div className="metrica">
@@ -81,6 +94,7 @@ const CAMINHOS = {
   modelos: 'M12 3v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   previsoes: 'M3 12h4l3-8 4 16 3-8h4',
   upload: 'M12 16V4m0 0-5 5m5-5 5 5M4 20h16',
+  globo: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z',
 }
 
 export function Icone({ nome, tamanho = 18 }) {

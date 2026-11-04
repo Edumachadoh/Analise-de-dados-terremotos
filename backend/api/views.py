@@ -5,18 +5,20 @@ A regra de negócio fica em api/services/, não aqui.
 """
 
 from django.conf import settings
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from shapely.geometry import shape
 
 from .filters import TerremotoFilter
-from .models import Coleta, ModeloTreinado, Terremoto
-from .serializers import (ColetaSerializer, ModeloTreinadoSerializer,
-                          PrevisaoQuerySerializer, TerremotoSerializer, TreinoSerializer,
-                          UploadCsvSerializer)
+from .models import Coleta, ModeloTreinado, Regiao, Terremoto
+from .serializers import (ColetaSerializer, ImportacaoRegiaoSerializer, ModeloTreinadoSerializer,
+                          PrevisaoQuerySerializer, RegiaoSerializer, TerremotoSerializer,
+                          TreinoSerializer, UploadCsvSerializer)
 from .services import estatisticas, importacao, ml
 from .services.usgs import ErroUSGS
 
@@ -27,7 +29,8 @@ class TerremotoViewSet(viewsets.ModelViewSet):
 
     Filtros: magnitude_min, magnitude_max, profundidade_min, profundidade_max,
     data_inicio, data_fim (AAAA-MM-DD), latitude_min/max, longitude_min/max,
-    local, faixa_profundidade (raso, intermediario, profundo), tsunami, alerta.
+    local, faixa_profundidade (raso, intermediario, profundo), tsunami, alerta,
+    regiao (código do continente ou oceano, ex.: america-do-sul).
     Ordenação: ?ordering=-magnitude (campos: data_hora, magnitude, profundidade_km).
     """
     queryset = Terremoto.objects.all()
@@ -35,6 +38,71 @@ class TerremotoViewSet(viewsets.ModelViewSet):
     filterset_class = TerremotoFilter
     ordering_fields = ["data_hora", "magnitude", "profundidade_km"]
     ordering = ["-data_hora"]
+
+
+class RegiaoViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Regiões que a interface analisa: continentes e oceanos.
+
+    total_terremotos diz quantos eventos da base pertencem à região; 0 significa que os
+    dados dela ainda não foram importados. Use ?com_dados=true para listar só as que têm.
+    POST /api/regioes/{codigo}/importar/ busca no USGS os terremotos da região.
+    """
+    queryset = Regiao.objects.all()
+    serializer_class = RegiaoSerializer
+    lookup_field = "codigo"
+    pagination_class = None  # são poucas
+
+    def get_queryset(self):
+        regioes = list(super().get_queryset())
+        if self.action != "list":
+            return regioes
+        contagem = dict(Terremoto.objects.values_list("zona").annotate(total=Count("id")))
+        for r in regioes:
+            r.total_terremotos = contagem.get(r.codigo, 0)
+        if self.request.query_params.get("com_dados") in ("true", "1"):
+            regioes = [r for r in regioes if r.total_terremotos]
+        return regioes
+
+    def get_object(self):
+        regiao = get_object_or_404(Regiao, codigo=self.kwargs["codigo"])
+        regiao.total_terremotos = regiao.filtrar(Terremoto.objects.all()).count()
+        return regiao
+
+    @action(detail=False)
+    def mapa(self, request):
+        """Os polígonos de todas as regiões (GeoJSON) para desenhar o mapa de escolha."""
+        mapa = []
+        for r in Regiao.objects.all():
+            geometria = shape(r.geometria)
+            maior = max(getattr(geometria, "geoms", [geometria]), key=lambda parte: parte.area)
+            ponto = maior.representative_point()  # onde escrever o nome da região
+            mapa.append({"codigo": r.codigo, "tipo": r.tipo, "ordem": r.ordem,
+                         "centro": [ponto.y, ponto.x], "geometria": r.geometria, "costa": r.costa})
+        return Response(mapa)
+
+    @action(detail=True, methods=["post"], url_path="importar")
+    def importar(self, request, codigo=None):
+        """
+        Busca no USGS os terremotos da região e grava no banco.
+
+        Corpo: {"anos": 3, "magnitude_minima": null}. Sem magnitude_minima, usa a magnitude
+        de completude da região. Eventos que já existem são atualizados, não duplicados.
+        """
+        regiao = get_object_or_404(Regiao, codigo=codigo)
+        entrada = ImportacaoRegiaoSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        try:
+            coleta = importacao.importar_do_usgs(entrada.validated_data["anos"],
+                                                 entrada.validated_data["magnitude_minima"],
+                                                 regiao=regiao)
+        except ErroUSGS as erro:
+            # A falha foi do serviço externo, não do cliente: 502 Bad Gateway.
+            # A coleta fica registrada com status "erro" e a mensagem.
+            return Response(ColetaSerializer(erro.coleta).data, status=status.HTTP_502_BAD_GATEWAY)
+        except ValueError as erro:
+            raise ValidationError({"detail": str(erro)}) from erro  # região sem caixas: 400
+        return Response(ColetaSerializer(coleta).data, status=status.HTTP_201_CREATED)
 
 
 class EstatisticaViewSet(viewsets.ViewSet):
@@ -66,6 +134,21 @@ class EstatisticaViewSet(viewsets.ViewSet):
     def por_profundidade(self, request):
         """Quantidade e magnitude média por faixa de profundidade."""
         return Response(estatisticas.por_faixa_profundidade(self._queryset(request)))
+
+    @action(detail=False, url_path="correlacao")
+    def correlacao(self, request):
+        """Correlação de Pearson entre magnitude, profundidade, estações, lacuna e rms."""
+        return Response(estatisticas.correlacao(self._queryset(request)))
+
+    @action(detail=False, url_path="janelas")
+    def janelas(self, request):
+        """AUC de cada feature de histórico do ML (alvo M >= 4,5, células de 1°)."""
+        return Response(estatisticas.poder_das_janelas(self._queryset(request)))
+
+    @action(detail=False, url_path="casos-positivos")
+    def casos_positivos(self, request):
+        """Fração de célula x período com terremoto >= alvo, por alvo e tamanho de célula."""
+        return Response(estatisticas.casos_positivos(self._queryset(request)))
 
 
 class ColetaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,

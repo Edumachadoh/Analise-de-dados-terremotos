@@ -139,7 +139,6 @@ select {
 .conteudo {
   padding: 28px 32px 48px;
   min-width: 0;
-  max-width: 1400px;
 }
 
 .cabecalho {
@@ -160,7 +159,7 @@ select {
 
 .grade-cartoes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -202,6 +201,11 @@ select {
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.alternar {
+  display: flex;
+  gap: 4px;
 }
 
 .metricas {
@@ -520,18 +524,6 @@ td.num {
   height: max(360px, calc(100vh - 340px));
 }
 
-/* Aviso fixo abaixo do mapa quando só uma amostra dos pontos é desenhada */
-.nota-mapa {
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  background: var(--alerta-fundo);
-  border: 1px solid var(--borda);
-  border-radius: 8px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--texto);
-}
-
 /* ------------------------------------------------------------ matriz de correlação */
 
 .matriz-correlacao {
@@ -660,6 +652,12 @@ td.num {
 
 /* ------------------------------------------------------------ telas menores */
 
+@media (max-width: 1200px) {
+  .grade-cartoes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 900px) {
   .app {
     grid-template-columns: 1fr;
@@ -674,5 +672,286 @@ td.num {
   .grade-cartoes,
   .modelos {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------------------------ análise guiada do Painel */
+
+.etapa {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.etapa .numero {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  background: var(--serie-1);
+  color: #fff;
+}
+
+.etapa h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.etapa p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--texto-2);
+}
+
+.escala-correlacao {
+  margin-top: 14px;
+  max-width: 560px;
+  font-size: 12px;
+  color: var(--texto-2);
+}
+
+.escala-correlacao .barra {
+  height: 14px;
+  border-radius: 7px;
+}
+
+.escala-correlacao .marcas {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.escala-correlacao .marcas span:nth-child(2) {
+  text-align: center;
+}
+
+.escala-correlacao .marcas span:last-child {
+  text-align: right;
+}
+
+.escala-correlacao p {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+/* Filtro de período: um campo por linha, para a data não ser cortada */
+.subcampo {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ------------------------------------------------------------ escolha da região */
+
+.regioes {
+  display: grid;
+  gap: 16px;
+}
+
+.opcoes-regiao {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.grupo-regioes {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-mudo);
+}
+
+.grupo-regioes:first-child {
+  margin-top: 0;
+}
+
+/* uma região por linha: nome à esquerda, quantidade de terremotos à direita */
+.opcao-regiao {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 8px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcao-regiao span {
+  font-size: 12px;
+  color: var(--texto-mudo);
+}
+
+.opcao-regiao:hover {
+  background: var(--superficie-2);
+}
+
+.opcao-regiao.ativo {
+  border-color: var(--destaque);
+  background: var(--superficie-2);
+}
+
+/* mapa à esquerda; painel da região e lista à direita, sempre à vista ao rolar */
+.regioes-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: stretch; /* o painel lateral tem a mesma altura do cartão do mapa */
+}
+
+.regioes-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* o cartão da lista ocupa o que sobra, até a base do cartão do mapa */
+.regioes-lateral > .cartao:last-child {
+  flex: 1;
+}
+
+@media (max-width: 1280px) {
+  .regioes-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .regioes-lateral > .cartao:last-child {
+    flex: none;
+  }
+
+}
+
+.regiao-atual {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--texto-2);
+}
+
+.regiao-atual strong {
+  font-size: 16px;
+  color: var(--texto);
+}
+
+.subtitulo-secao {
+  margin: 16px 0 6px;
+  font-size: 14px;
+}
+
+/* O mapa cabe inteiro na janela, de 72°S a 80°N (com a Antártida): a altura é a que sobra abaixo do cabeçalho e a
+   largura acompanha a proporção do mundo. Em janela mais baixa ele fica menor, mas sempre aparece por inteiro. */
+.mapa-regioes {
+  height: max(calc(100vh - 250px), 320px);
+  max-height: 820px;
+  aspect-ratio: 1.46;
+  width: auto;
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--plano);
+}
+
+.mapa-regioes .leaflet-container {
+  font: inherit;
+  background: var(--plano);
+}
+
+/* nome da região escrito sobre o mapa */
+.leaflet-tooltip.rotulo-regiao {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1c1c1c;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  pointer-events: none;
+}
+
+.leaflet-tooltip.rotulo-regiao::before {
+  display: none;
+}
+
+/* no layout com painel lateral, o mapa ocupa só a primeira coluna */
+.regioes-layout .cartao.largo {
+  grid-column: auto;
+}
+
+/* em tela estreita o painel fica abaixo do mapa e o mapa usa a largura toda, na proporção do mundo */
+@media (max-width: 1280px) {
+  .mapa-regioes {
+    height: auto;
+    max-height: none;
+    width: 100%;
+  }
+}
+
+/* bolha de um grupo de terremotos no mapa (leaflet.markercluster) */
+.grupo-mapa span {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* painel da região: importação recolhida e mais compacto */
+.importacao-regiao {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.importacao-regiao summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--texto-2);
+}
+
+.importacao-regiao[open] summary {
+  margin-bottom: 6px;
+}
+
+.regioes-lateral .cartao {
+  padding: 12px 14px;
+}
+
+.regioes-lateral .grupo-regioes {
+  margin: 8px 0 4px;
+}
+
+/* janela baixa (menos de 820 px): painel lateral mais compacto, para a página não precisar rolar */
+@media (max-height: 820px) and (min-width: 1281px) {
+  .importacao-regiao .texto-explicacao {
+    display: none;
+  }
+
+  .opcao-regiao {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
   }
 }

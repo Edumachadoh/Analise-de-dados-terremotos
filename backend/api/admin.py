@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Coleta, ModeloTreinado, Terremoto
+from .models import Coleta, ModeloTreinado, Regiao, Terremoto
+
+
+@admin.register(Regiao)
+class RegiaoAdmin(admin.ModelAdmin):
+    list_display = ("ordem", "nome", "tipo", "magnitude_completude")
+    exclude = ("geometria", "costa")  # polígonos enormes: só o comando carregar_regioes os grava
 
 
 @admin.register(Terremoto)

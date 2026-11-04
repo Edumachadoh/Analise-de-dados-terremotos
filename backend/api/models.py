@@ -1,6 +1,7 @@
 """
 Models da API.
 
+- Regiao: um continente ou oceano, o recorte que a interface analisa.
 - Terremoto: um evento sísmico do catálogo do USGS.
 - Coleta: o registro de cada importação feita a partir do USGS.
 - ModeloTreinado: um modelo de machine learning treinado, com parâmetros e métricas.
@@ -9,6 +10,56 @@ Models da API.
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+
+
+class Regiao(models.Model):
+    """
+    Uma região de análise: um continente ou um oceano. Estatísticas, mapa, dados e importação do
+    USGS da interface são de uma região.
+
+    O terremoto pertence ao continente que o contém ou, no mar, ao continente mais próximo até
+    cerca de 200 km da costa (`costa`); mais longe, ao oceano que o contém. O resultado fica
+    gravado em Terremoto.zona, então cada evento pertence a uma região só.
+    """
+
+    class Tipo(models.TextChoices):
+        CONTINENTE = "continente", "Continente"
+        OCEANO = "oceano", "Oceano"
+
+    codigo = models.SlugField("código", max_length=60, unique=True,
+                              help_text="Nome sem acentos e com hífens, ex.: america-do-sul")
+    nome = models.CharField(max_length=100)
+    tipo = models.CharField(max_length=12, choices=Tipo.choices, default=Tipo.CONTINENTE)
+    geometria = models.JSONField(
+        default=dict, blank=True,
+        help_text="Polígono da região (GeoJSON), em [longitude, latitude]",
+    )
+    costa = models.JSONField(
+        default=dict, blank=True,
+        help_text="Só continentes: a geometria com uma faixa de mar em volta (~200 km)",
+    )
+    caixas = models.JSONField(
+        default=list, blank=True,
+        help_text="Uma caixa [lat_min, lat_max, lon_min, lon_max] por parte da região: é o que "
+                  "se consulta no USGS (a classificação usa os polígonos, não as caixas)",
+    )
+    ordem = models.PositiveSmallIntegerField(default=0)
+    magnitude_completude = models.FloatField(
+        "magnitude de completude", default=4.0,
+        help_text="Abaixo disso o catálogo da região é incompleto. Padrão da importação por região.",
+    )
+
+    class Meta:
+        ordering = ["ordem"]
+        verbose_name = "região"
+        verbose_name_plural = "regiões"
+
+    def __str__(self):
+        return self.nome
+
+    def filtrar(self, queryset):
+        """Terremotos que pertencem à região."""
+        return queryset.filter(zona=self.codigo)
 
 
 class Terremoto(models.Model):
@@ -63,6 +114,9 @@ class Terremoto(models.Model):
     rms = models.FloatField(null=True, blank=True)
     status = models.CharField(max_length=20, blank=True)
     rede = models.CharField("rede sismográfica", max_length=10, blank=True)
+
+    # Região a que o evento pertence (Regiao.codigo), calculada pelas coordenadas
+    zona = models.CharField(max_length=60, blank=True, db_index=True)
 
     class Meta:
         ordering = ["-data_hora"]

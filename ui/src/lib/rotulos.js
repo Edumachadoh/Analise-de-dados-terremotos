@@ -12,7 +12,7 @@ const CAMPOS = {
   tipo_magnitude: 'Escala de magnitude',
   data_hora: 'Data e hora',
   atualizado_em: 'Atualizado em',
-  tsunami: 'Alerta de tsunami',
+  tsunami: 'Mensagem de tsunami',
   alerta: 'Nível de alerta',
   significancia: 'Significância',
   relatos: 'Relatos de quem sentiu',

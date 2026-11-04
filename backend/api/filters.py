@@ -7,7 +7,7 @@ Exemplo:
 
 import django_filters
 
-from .models import Terremoto
+from .models import Regiao, Terremoto
 
 
 class TerremotoFilter(django_filters.FilterSet):
@@ -22,6 +22,10 @@ class TerremotoFilter(django_filters.FilterSet):
     longitude_min = django_filters.NumberFilter(field_name="longitude", lookup_expr="gte")
     longitude_max = django_filters.NumberFilter(field_name="longitude", lookup_expr="lte")
     local = django_filters.CharFilter(field_name="local", lookup_expr="icontains")
+    regiao = django_filters.ModelChoiceFilter(
+        field_name="codigo", to_field_name="codigo", queryset=Regiao.objects.all(),
+        method="filtrar_regiao", help_text="Código do continente ou oceano, ex.: america-do-sul",
+    )
     faixa_profundidade = django_filters.ChoiceFilter(
         method="filtrar_faixa",
         choices=[("raso", "Raso"), ("intermediario", "Intermediário"), ("profundo", "Profundo")],
@@ -30,6 +34,10 @@ class TerremotoFilter(django_filters.FilterSet):
     class Meta:
         model = Terremoto
         fields = ["tsunami", "alerta", "tipo_magnitude"]
+
+    def filtrar_regiao(self, queryset, name, regiao):
+        """A região vira um filtro pela coluna zona, gravada na importação."""
+        return regiao.filtrar(queryset)
 
     def filtrar_faixa(self, queryset, name, valor):
         """A faixa não é uma coluna do banco: vira um filtro de intervalo."""

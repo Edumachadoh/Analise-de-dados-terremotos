@@ -50,10 +50,18 @@ export function consulta(filtros = {}, extras = {}) {
   return texto ? `?${texto}` : ''
 }
 
-export const apiReal = {
-  local: false,
+export const apiTerremoto = {
+  // ---------------------------------------------------------------- regiões (continentes e oceanos)
+  // total_terremotos = quantos eventos da base pertencem à região (0 = ainda não importada)
+  listarRegioes: () => requisitar('/regioes/'),
+  // Polígonos (GeoJSON) de cada região e da faixa de costa dos continentes, para desenhar o mapa
+  mapaRegioes: () => requisitar('/regioes/mapa/'),
+  // Busca no USGS os terremotos da região; pode levar alguns minutos
+  importarRegiao: (codigo, anos, magnitudeMinima) =>
+    requisitar(`/regioes/${codigo}/importar/`, postJson({ anos, magnitude_minima: magnitudeMinima })),
 
   // ---------------------------------------------------------------- terremotos
+  // Os filtros aceitam `regiao` (código do continente ou oceano), que o back traduz no filtro dela.
   // `tamanho` (opcional) vira ?page_size=; sem ele, o back entrega 50 por página
   listarTerremotos: (filtros, pagina = 1, ordenacao = '-data_hora', tamanho) =>
     requisitar(`/terremotos/${consulta(filtros, { page: pagina, ordering: ordenacao, page_size: tamanho })}`),
@@ -63,14 +71,18 @@ export const apiReal = {
   porMes: (filtros) => requisitar(`/estatisticas/por-mes/${consulta(filtros)}`),
   porMagnitude: (filtros) => requisitar(`/estatisticas/por-magnitude/${consulta(filtros)}`),
   porProfundidade: (filtros) => requisitar(`/estatisticas/por-profundidade/${consulta(filtros)}`),
+  // AUC de cada feature de histórico do ML, para o gráfico de janelas do Painel
+  janelas: (filtros) => requisitar(`/estatisticas/janelas/${consulta(filtros)}`),
+  // Correlação de Pearson entre as colunas numéricas: { colunas, valores (matriz n×n) }
+  correlacao: (filtros) => requisitar(`/estatisticas/correlacao/${consulta(filtros)}`),
 
   // ---------------------------------------------------------------- coletas
   listarColetas: () => requisitar('/coletas/'),
-  importarDoUsgs: (anos, magnitudeMinima) =>
-    requisitar('/coletas/', postJson({ anos, magnitude_minima: magnitudeMinima })),
+  // Busca no USGS os terremotos do mundo inteiro; pode levar alguns minutos
+  importarMundo: (anos, magnitudeMinima) => requisitar('/coletas/', postJson({ anos, magnitude_minima: magnitudeMinima })),
 
   // .csv, .json (inclusive GeoJSON) ou .xml, com as colunas do USGS. Cada caso (coluna faltando, linhas inválidas, encoding...) e o que a tela
-  // mostra estão no README, seção "Envio de arquivo: como o upload se comporta".
+  // mostra estão no README, seção "Upload de arquivos: como se comporta".
   enviarArquivo(arquivo) {
     const formulario = new FormData()
     formulario.append('arquivo', arquivo)

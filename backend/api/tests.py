@@ -18,18 +18,43 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import Coleta, ModeloTreinado, Terremoto
-from .services import importacao, ml
+from .models import Coleta, ModeloTreinado, Regiao, Terremoto
+from .services import estatisticas, importacao, ml, zonas
 from .services.usgs import ErroUSGS
 
 AGORA = datetime(2026, 10, 1, tzinfo=timezone.utc)
+
+
+def _retangulos(caixas):
+    return {"type": "MultiPolygon", "coordinates": [
+        [[[lon_min, lat_min], [lon_max, lat_min], [lon_max, lat_max],
+          [lon_min, lat_max], [lon_min, lat_min]]]
+        for lat_min, lat_max, lon_min, lon_max in caixas]}
+
+
+def criar_regiao(codigo="japan", nome="Japan", caixas=((24, 46, 122, 146),),
+                 tipo=Regiao.Tipo.CONTINENTE, margem=0, **campos) -> Regiao:
+    """
+    Uma região de teste: cada caixa (lat_min, lat_max, lon_min, lon_max) vira um retângulo do
+    polígono. `margem` (graus) alarga a faixa de costa dos continentes.
+    """
+    campos.setdefault("ordem", Regiao.objects.count())
+    costa = {}
+    if tipo == Regiao.Tipo.CONTINENTE:
+        costa = _retangulos([(a - margem, b + margem, c - margem, d + margem)
+                             for a, b, c, d in caixas])
+    return Regiao.objects.create(codigo=codigo, nome=nome, tipo=tipo, geometria=_retangulos(caixas),
+                                 costa=costa, caixas=[list(c) for c in caixas], **campos)
 
 
 def criar_terremoto(**campos) -> Terremoto:
     padrao = dict(usgs_id=f"t{Terremoto.objects.count()}", latitude=35.7, longitude=139.7,
                   profundidade_km=30, magnitude=4.0, data_hora=AGORA, local="Teste, Japão")
     padrao.update(campos)
-    return Terremoto.objects.create(**padrao)
+    terremoto = Terremoto(**padrao)
+    zonas.atribuir([terremoto])  # as regiões precisam existir antes dos terremotos
+    terremoto.save()
+    return terremoto
 
 
 def feature_usgs(id_, mag=4.6, lat=38.3, lon=142.4, prof=40.0, dias_atras=10):
@@ -106,6 +131,90 @@ class TerremotoApiTests(TestCase):
         self.assertEqual(self.cliente.post("/api/terremotos/", dados, format="json").status_code, 400)
 
 
+class RegiaoTests(TestCase):
+    def setUp(self):
+        self.cliente = APIClient()
+        criar_regiao()
+        criar_regiao("america-do-sul", "América do Sul", [(-56, -17, -76, -66)])
+        criar_terremoto(latitude=35.7, longitude=139.7)          # Japão
+        criar_terremoto(latitude=36.0, longitude=140.0)          # Japão
+        criar_terremoto(latitude=-33.4, longitude=-70.6)         # América do Sul
+
+    def test_filtro_por_regiao(self):
+        japao = self.cliente.get("/api/terremotos/?regiao=japan").json()
+        sul = self.cliente.get("/api/terremotos/?regiao=america-do-sul").json()
+        self.assertEqual((japao["count"], sul["count"]), (2, 1))
+
+    def test_regiao_inexistente_400(self):
+        self.assertEqual(self.cliente.get("/api/terremotos/?regiao=atlantida").status_code, 400)
+
+    def test_estatisticas_respeitam_a_regiao(self):
+        self.assertEqual(self.cliente.get("/api/estatisticas/?regiao=america-do-sul").json()["total"], 1)
+
+    def test_lista_com_contagem_de_terremotos(self):
+        regioes = {r["codigo"]: r for r in self.cliente.get("/api/regioes/").json()}
+        self.assertEqual(regioes["japan"]["total_terremotos"], 2)
+        self.assertEqual(regioes["america-do-sul"]["total_terremotos"], 1)
+        criar_regiao("africa", "África", [(-35, 37, -18, 52)])
+        com_dados = self.cliente.get("/api/regioes/?com_dados=true").json()
+        self.assertEqual({r["codigo"] for r in com_dados}, {"japan", "america-do-sul"})
+
+    def test_detalhe_da_regiao(self):
+        dados = self.cliente.get("/api/regioes/japan/").json()
+        self.assertEqual((dados["nome"], dados["total_terremotos"]), ("Japan", 2))
+        self.assertEqual(self.cliente.get("/api/regioes/atlantida/").status_code, 404)
+
+    def test_importar_regiao_sem_recorte_400(self):
+        criar_regiao("vazia", "Sem recorte", [], tipo=Regiao.Tipo.OCEANO)
+        resposta = self.cliente.post("/api/regioes/vazia/importar/", {}, format="json")
+        self.assertEqual(resposta.status_code, 400)
+
+
+class ClassificacaoTests(TestCase):
+    """Terra, costa e mar aberto: a regra que decide a região de cada terremoto."""
+
+    def setUp(self):
+        criar_regiao("ilha", "Ilha", [(30, 40, 130, 140)], margem=2)
+        criar_regiao("ilha-vizinha", "Ilha vizinha", [(30, 40, 143, 150)], margem=2)
+        criar_regiao("mar", "Mar", [(0, 60, 100, 170)], tipo=Regiao.Tipo.OCEANO)
+        self.classificador = zonas.Classificador()
+
+    def test_em_terra(self):
+        self.assertEqual(self.classificador.zona_do_ponto(35, 135), "ilha")
+        self.assertEqual(self.classificador.zona_do_ponto(35, 145), "ilha-vizinha")
+
+    def test_no_mar_perto_da_costa_vai_para_o_continente_mais_proximo(self):
+        # 141,2° e 141,9° estão na costa das duas ilhas; ganha a mais próxima
+        self.assertEqual(self.classificador.zona_do_ponto(35, 141.2), "ilha")
+        self.assertEqual(self.classificador.zona_do_ponto(35, 141.9), "ilha-vizinha")
+
+    def test_no_mar_aberto_vai_para_o_oceano(self):
+        self.assertEqual(self.classificador.zona_do_ponto(10, 120), "mar")
+
+    def test_fora_de_todos_os_poligonos_vai_para_o_oceano_mais_proximo(self):
+        self.assertEqual(self.classificador.zona_do_ponto(-50, 0), "mar")
+
+    def test_reclassificar_concorda_com_atribuir(self):
+        pontos = [(35, 135), (35, 145), (35, 141.2), (35, 141.9), (10, 120), (-50, 0)]
+        lista = [Terremoto(usgs_id=f"p{i}", latitude=lat, longitude=lon, profundidade_km=10,
+                           magnitude=4.0, data_hora=AGORA) for i, (lat, lon) in enumerate(pontos)]
+        zonas.atribuir(lista)
+        esperado = {t.usgs_id: t.zona for t in lista}
+        for t in lista:
+            t.zona = "errada"
+        Terremoto.objects.bulk_create(lista)
+        contagem = zonas.reclassificar()
+        self.assertEqual(dict(Terremoto.objects.values_list("usgs_id", "zona")), esperado)
+        self.assertEqual(sum(contagem.values()), len(pontos))
+
+    @mock.patch("api.services.usgs.buscar_terremotos")
+    def test_importacao_grava_a_regiao_do_evento(self, buscar):
+        # consultado pelo oceano, mas o evento está na ilha
+        buscar.return_value = [feature_usgs("a", lat=35, lon=135)]
+        importacao.importar_do_usgs(1, regiao=Regiao.objects.get(codigo="mar"))
+        self.assertEqual(Terremoto.objects.get(usgs_id="a").zona, "ilha")
+
+
 class EstatisticaTests(TestCase):
     def setUp(self):
         self.cliente = APIClient()
@@ -133,6 +242,42 @@ class EstatisticaTests(TestCase):
     def test_por_mes(self):
         meses = self.cliente.get("/api/estatisticas/por-mes/").json()
         self.assertEqual([m["mes"] for m in meses], ["2026-08", "2026-10"])
+
+    def test_correlacao(self):
+        dados = self.cliente.get("/api/estatisticas/correlacao/").json()
+        self.assertEqual(dados["colunas"], estatisticas.CAMPOS_CORRELACAO)
+        self.assertAlmostEqual(dados["valores"][0][0], 1)
+        self.assertAlmostEqual(dados["valores"][0][1], dados["valores"][1][0])
+        self.assertIsNone(dados["valores"][0][2])  # nenhum evento de teste tem estações
+
+    def test_analises_do_ml_sem_dados_suficientes(self):
+        self.assertEqual(self.cliente.get("/api/estatisticas/janelas/").json(), [])
+        self.assertEqual(self.cliente.get("/api/estatisticas/casos-positivos/").json(), [])
+
+
+class AnalisesDoMlTests(TestCase):
+    def setUp(self):
+        self.cliente = APIClient()
+        criar_base_sintetica()
+
+    def test_janelas(self):
+        janelas = {j["feature"]: j["auc"] for j in self.cliente.get("/api/estatisticas/janelas/").json()}
+        self.assertEqual(list(janelas), estatisticas.JANELAS)
+        self.assertTrue(all(0 <= auc <= 1 for auc in janelas.values()))
+
+    def test_janelas_por_faixa_cobrem_a_tabela_do_ml(self):
+        painel, _ = ml.montar_painel(ml._dataframe(Terremoto.objects.all()), 4.5, 1.0)
+        for janela in self.cliente.get("/api/estatisticas/janelas/").json():
+            self.assertEqual(sum(f["linhas"] for f in janela["faixas"]), len(painel))
+            self.assertEqual(sum(f["positivos"] for f in janela["faixas"]), int(painel["alvo"].sum()))
+
+    def test_casos_positivos_bate_com_a_tabela_do_ml(self):
+        linhas = self.cliente.get("/api/estatisticas/casos-positivos/").json()
+        self.assertEqual(len(linhas), len(estatisticas.TAMANHOS_CELULA) * len(estatisticas.ALVOS))
+        um_grau = next(l for l in linhas if l["tamanho_celula"] == 1.0 and l["magnitude_alvo"] == 4.5)
+        painel, _ = ml.montar_painel(ml._dataframe(Terremoto.objects.all()), 4.5, 1.0)
+        self.assertEqual(um_grau["linhas"], len(painel))
+        self.assertEqual(um_grau["positivos"], int(painel["alvo"].sum()))
 
 
 class ImportacaoTests(TestCase):
@@ -396,3 +541,54 @@ class MlTests(TestCase):
         self.assertTrue(arquivo.exists())
         self.assertEqual(self.cliente.delete(f"/api/modelos/{modelo['id']}/").status_code, 204)
         self.assertFalse(arquivo.exists())
+
+
+class ImportacaoPorRegiaoTests(TestCase):
+    def setUp(self):
+        self.regiao = criar_regiao()
+
+    @mock.patch("api.services.usgs.buscar_terremotos")
+    def test_importa_a_regiao_pela_api(self, buscar):
+        buscar.return_value = [feature_usgs("a")]
+        resposta = APIClient().post("/api/regioes/japan/importar/", {"anos": 2}, format="json")
+        self.assertEqual(resposta.status_code, 201)
+        self.assertEqual(resposta.json()["novos"], 1)
+        # consulta só as caixas da região, com a magnitude de completude dela
+        buscar.assert_called_once_with(2, 4.0, self.regiao.caixas)
+
+    @mock.patch("api.services.usgs.buscar_terremotos", side_effect=ErroUSGS("fora do ar"))
+    def test_usgs_fora_do_ar_na_importacao_da_regiao(self, _):
+        resposta = APIClient().post("/api/regioes/japan/importar/", {"anos": 2}, format="json")
+        self.assertEqual(resposta.status_code, 502)
+        self.assertEqual(Coleta.objects.get().status, Coleta.Status.ERRO)
+
+    def test_importar_regiao_inexistente_404(self):
+        resposta = APIClient().post("/api/regioes/atlantida/importar/", {}, format="json")
+        self.assertEqual(resposta.status_code, 404)
+
+
+class CorrecaoDeContinentesTests(TestCase):
+    """O Natural Earth põe a Rússia inteira na Europa e a Guiana Francesa na França."""
+
+    def test_russia_e_guiana_francesa(self):
+        from api.management.commands.carregar_regioes import _partes_por_continente
+        from shapely.geometry import box, shape
+        from shapely.ops import unary_union
+
+        def pais(nome, continente, *caixas):
+            return {"properties": {"ADMIN": nome, "CONTINENT": continente},
+                    "geometry": {"type": "MultiPolygon", "coordinates": [
+                        [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]
+                        for y0, y1, x0, x1 in caixas]}}
+
+        partes = _partes_por_continente([
+            pais("Russia", "Europe", (50, 70, 30, 170)),            # Europa e Sibéria
+            pais("France", "Europe", (42, 50, -5, 8), (2, 6, -54, -52)),  # França e Guiana
+        ])
+        europa, asia = unary_union(partes["Europe"]), unary_union(partes["Asia"])
+        sul = unary_union(partes["South America"])
+        self.assertTrue(europa.contains(shape({"type": "Point", "coordinates": [40, 60]})))
+        self.assertTrue(asia.contains(shape({"type": "Point", "coordinates": [100, 60]})))
+        self.assertFalse(europa.intersects(box(60, 50, 170, 70).buffer(-1)))
+        self.assertTrue(sul.contains(shape({"type": "Point", "coordinates": [-53, 4]})))
+        self.assertFalse(europa.intersects(box(-54, 2, -52, 6)))

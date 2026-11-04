@@ -18,15 +18,15 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone as dj_timezone
 
-from ..models import Coleta, Terremoto
-from . import usgs
+from ..models import Coleta, Regiao, Terremoto
+from . import usgs, zonas
 
 # Campos atualizados quando o evento já existe no banco (o USGS revisa eventos)
 CAMPOS_ATUALIZAVEIS = [
     "local", "latitude", "longitude", "profundidade_km", "magnitude", "tipo_magnitude",
     "data_hora", "atualizado_em", "tsunami", "alerta", "significancia", "relatos",
     "intensidade_relatada", "intensidade_estimada", "estacoes", "lacuna_azimutal",
-    "distancia_estacao", "rms", "status", "rede",
+    "distancia_estacao", "rms", "status", "rede", "zona",
 ]
 
 LOTE_CONSULTA = 10_000  # ids por consulta ao verificar quais eventos já existem
@@ -150,6 +150,7 @@ def _executar(coleta: Coleta, obter_registros) -> Coleta:
     try:
         registros = obter_registros()
         terremotos = [terremoto_de_registro(r) for r in registros]
+        zonas.atribuir(terremotos)
         novos, atualizados = salvar_terremotos(terremotos)
         coleta.recebidos = len(terremotos)
         coleta.novos, coleta.atualizados = novos, atualizados
@@ -165,17 +166,31 @@ def _executar(coleta: Coleta, obter_registros) -> Coleta:
     return coleta
 
 
-def importar_do_usgs(anos: int, magnitude_minima: float | None = None) -> Coleta:
+def importar_do_usgs(anos: int, magnitude_minima: float | None = None,
+                     regiao: Regiao | None = None) -> Coleta:
     """
-    Busca os terremotos do mundo inteiro dos últimos `anos` na API do USGS e grava.
-    Sem magnitude_minima, usa settings.MAGNITUDE_MINIMA_COLETA.
+    Busca os terremotos dos últimos `anos` na API do USGS e grava.
+
+    Sem `regiao`, baixa o recorte padrão (o mundo inteiro) e, sem magnitude_minima, usa
+    settings.MAGNITUDE_MINIMA_COLETA. Com `regiao`, baixa as caixas dela e, sem magnitude_minima,
+    usa a magnitude de completude dela. A caixa pega também eventos de regiões vizinhas: cada
+    evento recebe a região a que de fato pertence.
     """
+    caixas = None
+    if regiao is not None:
+        if not regiao.caixas:
+            raise ValueError(f"'{regiao.nome}' não tem recorte para consultar o USGS.")
+        caixas = regiao.caixas
+        if magnitude_minima is None:
+            magnitude_minima = regiao.magnitude_completude
     if magnitude_minima is None:
         magnitude_minima = settings.MAGNITUDE_MINIMA_COLETA
     coleta = Coleta.objects.create(anos=anos, magnitude_minima=magnitude_minima)
+    # sem região a chamada é a de sempre (anos, magnitude); com região, leva também as caixas
+    argumentos = (anos, magnitude_minima) if caixas is None else (anos, magnitude_minima, caixas)
     return _executar(
         coleta,
-        lambda: [registro_de_feature(f) for f in usgs.buscar_terremotos(anos, magnitude_minima)],
+        lambda: [registro_de_feature(f) for f in usgs.buscar_terremotos(*argumentos)],
     )
 
 

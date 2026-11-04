@@ -1,42 +1,48 @@
-// Tela 1: visão geral. Os totais e as séries por mês vêm das estatísticas do back
-// (GET /api/estatisticas/...); a comparação entre países é calculada aqui, a partir
-// de todos os terremotos filtrados. Todos os números respeitam os filtros da barra lateral.
+// Painel: análise exploratória da região escolhida. Totais e séries por mês vêm do back
+// (GET /api/estatisticas/...); o resto é calculado aqui com todos os terremotos filtrados.
+// Só entram terremotos acima da magnitude de completude da região.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../api/index.js'
-import { Aviso, Cabecalho, Carregando, Cartao, Metrica } from '../componentes/comuns.jsx'
-import { quantosFiltros } from '../componentes/Filtros.jsx'
-import { Barras, BarrasDuplasHorizontais, BarrasHorizontais, DispersaoPorGrupo, Linha, MatrizCorrelacao, Rosca } from '../componentes/graficos.jsx'
-import { matrizCorrelacao } from '../lib/correlacao.js'
-import { amostrar, formatarData, formatarInteiro, formatarMes, formatarNumero, formatarPorcentagem } from '../lib/formato.js'
-import { estatisticasPorPais, paisDe, tsunamiPorMagnitude } from '../lib/regioes.js'
+import { Aviso, Cabecalho, Carregando, Cartao, Etapa, Metrica, Seletor } from '../componentes/comuns.jsx'
+import CartaoMapa from '../componentes/CartaoMapa.jsx'
+import { comCorte, quantosFiltros } from '../componentes/Filtros.jsx'
+import { Barras, BarrasHorizontais, Linha, Rosca } from '../componentes/graficos.jsx'
+import { mesesCompletos, raridadePorMagnitude } from '../lib/analise.js'
+import { formatarData, formatarInteiro, formatarMes, formatarNumero, formatarPorcentagem } from '../lib/formato.js'
+import { estatisticasPorPais, tsunamiPorMagnitude } from '../lib/regioes.js'
 import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 import { useTodosTerremotos } from '../lib/useTodosTerremotos.js'
 
-const MAX_PONTOS = 3000
-const TOP_PAISES = 10 // países mostrados nos gráficos de barras
-const PAISES_DISPERSAO = 6 // os demais viram "Outros" na dispersão
-const OUTROS = 'Outros'
-const CAMPOS_CORRELACAO = ['magnitude', 'profundidade_km', 'significancia', 'estacoes', 'lacuna_azimutal', 'rms']
+const TOP_PAISES = 10 // países mostrados no gráfico de barras
+const ESCALAS = [['log', 'Logarítmica'], ['linear', 'Quantidade']]
+const ALVO = 4.5 // magnitude-alvo padrão do modelo
 
-export default function Painel({ filtros, versaoBase }) {
-  const resumo = useCarregar(() => api.resumo(filtros), [filtros, versaoBase])
-  const porMes = useCarregar(() => api.porMes(filtros), [filtros, versaoBase])
-  const porMagnitude = useCarregar(() => api.porMagnitude(filtros), [filtros, versaoBase])
-  const porProfundidade = useCarregar(() => api.porProfundidade(filtros), [filtros, versaoBase])
+export default function Painel({ filtros, regiao, versaoBase }) {
+  const corte = regiao.magnitude_completude
+  const filtrosAnalise = useMemo(() => comCorte(filtros, corte), [filtros, corte])
+  const resumo = useCarregar(() => api.resumo(filtrosAnalise), [filtrosAnalise, versaoBase])
+  const semCorte = useCarregar(() => api.resumo(filtros), [filtros, versaoBase]) // para contar os que ficaram de fora
 
   const n = quantosFiltros(filtros)
   const r = resumo.dados
+  const deFora = r && semCorte.dados ? semCorte.dados.total - r.total : 0
 
   return (
     <>
       <Cabecalho titulo="Painel">
-        Terremotos registrados pelo USGS{n > 0 && ` · ${n} filtro${n > 1 ? 's' : ''} aplicado${n > 1 ? 's' : ''}`}
+        Análise exploratória · fonte: USGS{n > 0 && ` · ${n} filtro${n > 1 ? 's' : ''} aplicado${n > 1 ? 's' : ''}`}
       </Cabecalho>
 
       {resumo.erro && <Aviso tipo="erro">{resumo.erro}</Aviso>}
-      {r && r.total === 0 && <Aviso>Nenhum terremoto atende aos filtros. Ajuste ou limpe os filtros na barra lateral.</Aviso>}
+      {r && (
+        <Aviso>
+          Filtragem de terremotos com magnitude maior ou igual a {formatarNumero(filtrosAnalise.magnitude_min)}.
+          {deFora > 0 && <><br /><b>{formatarInteiro(deFora)} terremotos desconsiderados.</b></>}
+        </Aviso>
+      )}
+      {r && r.total === 0 && <Aviso>Nenhum terremoto atende aos filtros.</Aviso>}
 
       {r && r.total > 0 && (
         <>
@@ -47,30 +53,10 @@ export default function Painel({ filtros, versaoBase }) {
             <Metrica rotulo="Maior magnitude" valor={formatarNumero(r.magnitude_maxima)}
               detalhe={r.mais_forte && `${r.mais_forte.local} · ${formatarData(r.mais_forte.data_hora)}`} />
             <Metrica rotulo="Profundidade média" valor={`${formatarNumero(r.profundidade_media_km)} km`} />
-            <Metrica rotulo="Com alerta de tsunami" valor={formatarInteiro(r.com_alerta_tsunami)} />
+            <Metrica rotulo="Com mensagem de tsunami" valor={formatarInteiro(r.com_alerta_tsunami)} />
           </div>
 
-          <div className="grade-cartoes">
-            <AnalisePorPais filtros={filtros} versaoBase={versaoBase} />
-
-            <Cartao largo titulo="Terremotos por mês" subtitulo="Quantidade de eventos registrados em cada mês">
-              {porMes.dados ? (
-                <Linha dados={porMes.dados} chaveX="mes" chaveY="total" rotuloY="Terremotos" formatarX={formatarMes} />
-              ) : <Carregando />}
-            </Cartao>
-
-            <Cartao titulo="Terremotos por faixa de magnitude" subtitulo="Quantos eventos há em cada faixa">
-              {porMagnitude.dados ? (
-                <Barras dados={porMagnitude.dados.map((d) => ({ nome: d.faixa, valor: d.total }))} />
-              ) : <Carregando />}
-            </Cartao>
-
-            <Cartao titulo="Terremotos por faixa de profundidade" subtitulo="Raso: até 70 km · intermediário: 70 a 300 km · profundo: mais de 300 km">
-              {porProfundidade.dados ? (
-                <Rosca dados={porProfundidade.dados.map((d) => ({ nome: d.faixa, valor: d.total }))} />
-              ) : <Carregando />}
-            </Cartao>
-          </div>
+          <Analise filtros={filtrosAnalise} periodo={r.periodo} versaoBase={versaoBase} />
         </>
       )}
 
@@ -79,79 +65,91 @@ export default function Painel({ filtros, versaoBase }) {
   )
 }
 
-// Comparação entre países. Fica separada do resto do Painel: precisa de todos os terremotos,
-// e enquanto as páginas chegam só estes cartões são redesenhados.
-function AnalisePorPais({ filtros, versaoBase }) {
+// Separada do resto do Painel: precisa de todos os terremotos, que chegam aos poucos
+function Analise({ filtros, periodo, versaoBase }) {
   const eventos = useTodosTerremotos(filtros, versaoBase)
+  const porMes = useCarregar(() => api.porMes(filtros), [filtros, versaoBase])
+  const porProfundidade = useCarregar(() => api.porProfundidade(filtros), [filtros, versaoBase])
+  const janelas = useCarregar(() => api.janelas(filtros), [filtros, versaoBase])
+  const [escala, setEscala] = useState('log')
 
-  const analise = useMemo(() => {
+  const a = useMemo(() => {
     if (!eventos.completo) return null
-    const paises = estatisticasPorPais(eventos.itens)
-    const top = (campo) => [...paises].sort((a, b) => b[campo] - a[campo]).slice(0, TOP_PAISES)
-
-    // Dispersão: os países com mais eventos ganham cor própria, o resto vira "Outros"
-    const principais = top('total').slice(0, PAISES_DISPERSAO).map((p) => p.pais)
-    const grupos = new Map([...principais, OUTROS].map((nome) => [nome, []]))
-    for (const t of amostrar(eventos.itens, MAX_PONTOS)) {
-      const pais = paisDe(t.local)
-      grupos.get(grupos.has(pais) ? pais : OUTROS).push(t)
-    }
-
+    const itens = eventos.itens
+    const porPais = [...estatisticasPorPais(itens)].sort((x, y) => y.total - x.total).slice(0, TOP_PAISES)
     return {
-      quantos: paises.length,
-      magnitude: top('magnitude_media').map((p) => ({ nome: p.pais, ...p })),
-      total: top('total').map((p) => ({ nome: p.pais, valor: p.total, ...p })),
-      profundidade: top('profundidade_media').map((p) => ({ nome: p.pais, valor: p.profundidade_media, ...p })),
-      grupos: [...grupos].map(([nome, dados]) => ({ nome, dados })).filter((g) => g.dados.length),
-      tsunami: tsunamiPorMagnitude(eventos.itens),
-      correlacao: matrizCorrelacao(eventos.itens, CAMPOS_CORRELACAO),
+      porPais: porPais.map((p) => ({ nome: p.pais, valor: p.total, ...p })),
+      tsunami: tsunamiPorMagnitude(itens),
+      raridade: raridadePorMagnitude(itens),
+      // 10 km é o valor que o USGS usa quando não consegue calcular a profundidade
+      profundidade10: itens.length ? itens.filter((t) => t.profundidade_km === 10).length / itens.length : 0,
     }
   }, [eventos.completo, eventos.itens])
 
-  if (!analise) {
+  if (!a) {
     return (
-      <Cartao largo titulo="Comparação entre países">
+      <Cartao largo titulo="Análise dos dados">
         {eventos.erro ? <Aviso tipo="erro">{eventos.erro}</Aviso>
           : <Carregando texto={`Buscando os terremotos… ${formatarInteiro(eventos.itens.length)} de ${formatarInteiro(eventos.total ?? 0)}`} />}
       </Cartao>
     )
   }
 
-  const totalEMaxima = (d) => [['Terremotos', formatarInteiro(d.total)], ['Magnitude máxima', formatarNumero(d.magnitude_maxima)]]
+  // Com filtro de datas, os meses inteiros são contados a partir dele
+  const meses = porMes.dados && mesesCompletos(porMes.dados, filtros.data_inicio || periodo.inicio, filtros.data_fim ? `${filtros.data_fim}T23:59:59Z` : periodo.fim)
+  const semTsunami = filtros.tsunami === 'false' // sem mensagem nenhuma, o gráfico de tsunami ficaria zerado
+  const log = escala === 'log'
 
   return (
-    <>
-      <Cartao largo titulo="Magnitude por país"
-        subtitulo={`Onde os terremotos são mais fortes · os ${analise.magnitude.length} países com maior magnitude média (mínimo de 5 eventos)`}>
-        <BarrasDuplasHorizontais dados={analise.magnitude}
-          series={[{ chave: 'magnitude_media', rotulo: 'Magnitude média' }, { chave: 'magnitude_maxima', rotulo: 'Magnitude máxima' }]}
-          extras={(d) => [['Terremotos', formatarInteiro(d.total)]]} />
-      </Cartao>
+    <div className="grade-cartoes">
+      <Etapa numero="1" titulo="Localização" />
 
-      <Cartao titulo="Terremotos por país" subtitulo="Os países com mais eventos registrados">
-        <BarrasHorizontais dados={analise.total} rotuloValor="Terremotos" formatar={formatarInteiro} larguraRotulo={140}
+      <CartaoMapa dados={eventos.itens} chave={`${filtros.regiao}-${eventos.total}`} />
+
+      <Cartao largo titulo="Terremotos por país" subtitulo={`Top ${TOP_PAISES}`}>
+        <BarrasHorizontais dados={a.porPais} rotuloValor="Terremotos" formatar={formatarInteiro} larguraRotulo={140}
           extras={(d) => [['Magnitude média', formatarNumero(d.magnitude_media)]]} />
       </Cartao>
 
-      <Cartao titulo="Profundidade média por país" subtitulo="Onde os terremotos acontecem mais fundo (km)">
-        <BarrasHorizontais dados={analise.profundidade} rotuloValor="Profundidade média (km)" larguraRotulo={140}
-          extras={totalEMaxima} />
+      <Etapa numero="2" titulo="Magnitude" />
+
+      <Cartao largo titulo="Terremotos por magnitude mínima"
+        controles={<Seletor rotulo="Escala" valor={escala} opcoes={ESCALAS} aoMudar={setEscala} />}>
+        <Barras dados={a.raridade.map((x) => ({ nome: `≥ ${formatarNumero(x.limite)}`, valor: x.total }))} log={log} />
       </Cartao>
 
-      <Cartao largo titulo="Profundidade × magnitude por país"
-        subtitulo={`Cada ponto é um terremoto${analise.grupos.reduce((s, g) => s + g.dados.length, 0) >= MAX_PONTOS ? ` (amostra de ${formatarInteiro(MAX_PONTOS)})` : ''} · a profundidade cresce para baixo`}>
-        <DispersaoPorGrupo grupos={analise.grupos} x="magnitude" y="profundidade_km" outros={OUTROS}
-          rotuloX={rotulo('magnitude')} rotuloY={rotulo('profundidade_km')} inverterY />
+      {!semTsunami && (
+        <Cartao titulo="Mensagem de tsunami por magnitude" subtitulo="% de terremotos com mensagem de tsunami do USGS">
+          <Barras dados={a.tsunami} rotuloValor="Com mensagem" formatar={(v) => formatarPorcentagem(v)} />
+        </Cartao>
+      )}
+
+      <Cartao largo={semTsunami} titulo="Terremotos por faixa de profundidade"
+        subtitulo={`Raso: até 70 km · intermediário: 70 a 300 km · profundo: mais de 300 km · ${formatarPorcentagem(a.profundidade10, 0)} com profundidade de exatamente 10 km (valor-padrão do USGS)`}>
+        {porProfundidade.dados ? (
+          <Rosca dados={porProfundidade.dados.map((d) => ({ nome: d.faixa, valor: d.total }))} />
+        ) : <Carregando />}
       </Cartao>
 
-      <Cartao largo titulo="Relação entre as variáveis"
-        subtitulo="Correlação de Pearson, de -1 a 1: mostra o quanto duas medidas variam juntas (não prova que uma causa a outra)">
-        <MatrizCorrelacao colunas={CAMPOS_CORRELACAO.map((chave) => ({ chave, rotulo: rotulo(chave) }))} valores={analise.correlacao} />
+      <Etapa numero="3" titulo="Tempo" />
+
+      <Cartao largo titulo="Terremotos por mês" subtitulo="Meses incompletos no início e no fim da base excluídos">
+        {meses ? (
+          <Linha dados={meses} chaveX="mes" chaveY="total" rotuloY="Terremotos" formatarX={formatarMes} />
+        ) : <Carregando />}
       </Cartao>
 
-      <Cartao titulo="Alerta de tsunami por magnitude" subtitulo="Porcentagem dos terremotos de cada faixa que tiveram alerta de tsunami">
-        <Barras dados={analise.tsunami} rotuloValor="Com alerta" formatar={(v) => formatarPorcentagem(v)} />
+      <Cartao largo titulo="Poder de previsão por janela de histórico"
+        subtitulo={`AUC de cada feature sozinha para prever M ≥ ${formatarNumero(ALVO)} no período seguinte · 0,5 = chute, 1 = perfeito`}>
+        {janelas.erro && <Aviso tipo="erro">{janelas.erro}</Aviso>}
+        {janelas.dados?.length === 0 && <Aviso>Dados insuficientes para montar a tabela do modelo.</Aviso>}
+        {janelas.dados?.length > 0 && (
+          <BarrasHorizontais dados={janelas.dados.map((j) => ({ nome: rotulo(j.feature), valor: j.auc }))}
+            rotuloValor="AUC" formatar={(v) => formatarNumero(v, 2)} larguraRotulo={240} dominio={[0.5, 1]} />
+        )}
+        {!janelas.dados && !janelas.erro && <Carregando />}
       </Cartao>
-    </>
+    </div>
   )
 }
+

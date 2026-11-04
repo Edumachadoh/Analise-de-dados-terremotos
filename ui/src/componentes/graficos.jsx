@@ -19,13 +19,15 @@ function DicaRecharts({ active, payload, montar }) {
 }
 
 // dados: [{ nome, valor }]
-export function Barras({ dados, rotuloValor = 'Terremotos', formatar = formatarInteiro, altura = 280 }) {
+// `log`: eixo vertical em escala logarítmica (cada marca vale 10 vezes a anterior)
+export function Barras({ dados, rotuloValor = 'Terremotos', formatar = formatarInteiro, altura = 280, log = false }) {
   return (
     <ResponsiveContainer width="100%" height={altura}>
       <BarChart data={dados} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="var(--grade)" vertical={false} />
         <XAxis dataKey="nome" {...EIXO} interval={0} />
-        <YAxis {...EIXO} axisLine={false} width={48} tickFormatter={formatar} />
+        <YAxis {...EIXO} axisLine={false} width={48} tickFormatter={formatar}
+          {...(log ? { scale: 'log', domain: [1, 'auto'], allowDataOverflow: true } : {})} />
         <Tooltip cursor={CURSOR} content={<DicaRecharts montar={(d) => ({ titulo: d.nome, linhas: [[rotuloValor, formatar(d.valor)]] })} />} />
         <Bar dataKey="valor" fill="var(--serie-1)" radius={[4, 4, 0, 0]} maxBarSize={64} isAnimationActive={false} />
       </BarChart>
@@ -47,37 +49,6 @@ export function BarrasHorizontais({ dados, rotuloValor, formatar = formatarNumer
         <Bar dataKey="valor" fill="var(--serie-1)" radius={[0, 4, 4, 0]} maxBarSize={22} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
-  )
-}
-
-// Duas barras por categoria (ex.: magnitude média e máxima de cada país).
-// series: [{ chave, rotulo }]; a primeira usa a cor 1 e a segunda a cor 2.
-export function BarrasDuplasHorizontais({ dados, series, formatar = formatarNumero, larguraRotulo = 160, extras }) {
-  return (
-    <>
-      <ResponsiveContainer width="100%" height={Math.max(140, dados.length * 44 + 30)}>
-        <BarChart data={dados} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }} barGap={2}>
-          <CartesianGrid stroke="var(--grade)" horizontal={false} />
-          <XAxis type="number" {...EIXO} tickFormatter={formatar} domain={[0, 'auto']} />
-          <YAxis type="category" dataKey="nome" {...EIXO} axisLine={false} width={larguraRotulo} />
-          <Tooltip cursor={CURSOR} content={<DicaRecharts montar={(d) => ({
-            titulo: d.nome,
-            linhas: [...series.map((s) => [s.rotulo, formatar(d[s.chave])]), ...(extras ? extras(d) : [])],
-          })} />} />
-          {series.map((s, i) => (
-            <Bar key={s.chave} dataKey={s.chave} fill={CORES_SERIE[i]} radius={[0, 4, 4, 0]} maxBarSize={16} isAnimationActive={false} />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-      <div className="legenda">
-        {series.map((s, i) => (
-          <span className="item" key={s.chave}>
-            <span className="amostra" style={{ background: CORES_SERIE[i] }} />
-            {s.rotulo}
-          </span>
-        ))}
-      </div>
-    </>
   )
 }
 
@@ -127,37 +98,6 @@ export function Dispersao({ dados, x, y, rotuloX, rotuloY, inverterY = false, al
   )
 }
 
-// Dispersão com uma cor por grupo (ex.: país). grupos: [{ nome, dados }]; o último pode ser "Outros", em cinza.
-export function DispersaoPorGrupo({ grupos, x, y, rotuloX, rotuloY, inverterY = false, altura = 340, outros }) {
-  const cor = (g, i) => (g.nome === outros ? 'var(--serie-outros)' : CORES_SERIE[i % CORES_SERIE.length])
-  return (
-    <>
-      <ResponsiveContainer width="100%" height={altura}>
-        <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="var(--grade)" />
-          <XAxis type="number" dataKey={x} {...EIXO} domain={['dataMin', 'dataMax']} tickFormatter={(v) => formatarNumero(v)} />
-          <YAxis type="number" dataKey={y} {...EIXO} axisLine={false} width={48} reversed={inverterY}
-            domain={[0, 'dataMax']} tickFormatter={(v) => formatarNumero(v)} />
-          <Tooltip cursor={{ stroke: 'var(--eixo)' }} content={<DicaRecharts montar={(d) => ({
-            titulo: d.local || null, linhas: [[rotuloX, formatarNumero(d[x], 3)], [rotuloY, formatarNumero(d[y], 3)]],
-          })} />} />
-          {grupos.map((g, i) => (
-            <Scatter key={g.nome} name={g.nome} data={g.dados} fill={cor(g, i)} fillOpacity={0.55} isAnimationActive={false} />
-          ))}
-        </ScatterChart>
-      </ResponsiveContainer>
-      <div className="legenda">
-        {grupos.map((g, i) => (
-          <span className="item" key={g.nome}>
-            <span className="amostra" style={{ background: cor(g, i) }} />
-            {g.nome} · {formatarInteiro(g.dados.length)}
-          </span>
-        ))}
-      </div>
-    </>
-  )
-}
-
 // Matriz de correlação (Pearson). colunas: [{ chave, rotulo }]; valores: matriz n×n com null onde não há dado.
 // Azul = os dois sobem juntos; laranja = um sobe e o outro desce. Quanto mais forte a cor, maior a relação.
 export function MatrizCorrelacao({ colunas, valores }) {
@@ -183,10 +123,14 @@ export function MatrizCorrelacao({ colunas, valores }) {
           </Fragment>
         ))}
       </div>
-      <div className="legenda">
-        <span className="item"><span className="amostra" style={{ background: fundo(0.8) }} />positiva: sobem juntas</span>
-        <span className="item"><span className="amostra" style={{ background: fundo(-0.8) }} />negativa: uma sobe, a outra desce</span>
-        <span>· próximo de 0: sem relação · de ±0,3 a ±0,7: moderada · acima de ±0,7: forte</span>
+      <div className="escala-correlacao">
+        <div className="barra" style={{ background: `linear-gradient(to right, ${fundo(-1)}, var(--superficie-2) 50%, ${fundo(1)})` }} />
+        <div className="marcas">
+          <span>-1<br />uma sobe, a outra desce</span>
+          <span>0<br />não há relação</span>
+          <span>+1<br />sobem juntas</span>
+        </div>
+        <p>Fraca: -0,3 a 0,3 · moderada: 0,3 a 0,7 · forte: acima de 0,7 (em módulo)</p>
       </div>
     </>
   )

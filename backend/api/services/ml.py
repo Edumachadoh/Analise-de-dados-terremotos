@@ -42,6 +42,11 @@ from ..models import ModeloTreinado, Terremoto
 DIAS_PERIODO = 30
 PERIODOS_MINIMOS_TREINO = 6
 
+# Abaixo de ~M4 o catálogo global só registra os terremotos onde há muitos sismógrafos (EUA,
+# Japão...). Sem este corte, a feature de atividade geral mediria a densidade da rede, não a
+# atividade sísmica. Se a magnitude-alvo for menor, o corte desce até ela.
+MAGNITUDE_COMPLETUDE = 4.0
+
 FEATURES = [
     "cel_lat",                  # posição da célula
     "cel_lon",
@@ -49,7 +54,7 @@ FEATURES = [
     "eventos_3_periodos",        # ... nos 3 períodos anteriores
     "eventos_12_periodos",       # ... nos 12 períodos anteriores
     "taxa_historica",            # fração dos períodos passados com ao menos um evento
-    "atividade_geral_3_periodos",  # terremotos de qualquer magnitude nos 3 anteriores
+    "atividade_geral_3_periodos",  # terremotos acima da completude nos 3 anteriores
 ]
 
 
@@ -235,6 +240,11 @@ def criar_pipeline(algoritmo: str, parametros: dict) -> Pipeline:
 # =============================================================================
 # Preparação dos dados: tabela célula x período
 # =============================================================================
+def _base(magnitude_alvo: float):
+    """Os terremotos usados pelo ML: só os acima da magnitude de completude."""
+    return Terremoto.objects.filter(magnitude__gte=min(MAGNITUDE_COMPLETUDE, magnitude_alvo))
+
+
 def _dataframe(queryset) -> pd.DataFrame:
     df = pd.DataFrame.from_records(
         queryset.values("data_hora", "latitude", "longitude", "magnitude")
@@ -250,15 +260,10 @@ def _celula(valor, origem, tamanho):
     return np.round(origem + np.floor((valor - origem) / tamanho) * tamanho, 4)
 
 
-def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float,
-                  incluir_proximo: bool = False) -> tuple[pd.DataFrame, pd.Timestamp]:
+def celulas_e_periodos(df: pd.DataFrame, tamanho_celula: float) -> tuple[pd.DataFrame, int, pd.Timestamp]:
     """
-    Monta a tabela célula x período com o alvo e as features.
-
-    O período 0 é o mais antigo. Com incluir_proximo=True, acrescenta o período
-    seguinte ao último (sem alvo), que é o que será previsto.
-    Devolve (painel, data_referencia), sendo a data de referência o fim do
-    último período completo.
+    Acrescenta a cada terremoto a célula e o período (0 = o mais antigo).
+    Devolve (terremotos, número de períodos, data de referência).
     """
     lat_min, _, lon_min, _ = settings.REGIAO_ANALISE
     referencia = df["data_hora"].max()
@@ -276,7 +281,20 @@ def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float
         cel_lat=_celula(df["latitude"], lat_min, tamanho_celula),
         cel_lon=_celula(df["longitude"], lon_min, tamanho_celula),
     )
-    df = df[df["periodo"] >= 0]
+    return df[df["periodo"] >= 0], n_periodos, referencia
+
+
+def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float,
+                  incluir_proximo: bool = False) -> tuple[pd.DataFrame, pd.Timestamp]:
+    """
+    Monta a tabela célula x período com o alvo e as features.
+
+    O período 0 é o mais antigo. Com incluir_proximo=True, acrescenta o período
+    seguinte ao último (sem alvo), que é o que será previsto.
+    Devolve (painel, data_referencia), sendo a data de referência o fim do
+    último período completo.
+    """
+    df, n_periodos, referencia = celulas_e_periodos(df, tamanho_celula)
 
     total = df.groupby(["cel_lat", "cel_lon", "periodo"]).size().rename("n_total")
     alvo = (df[df["magnitude"] >= magnitude_alvo]
@@ -361,7 +379,7 @@ def treinar(algoritmo: str, parametros: dict | None = None, magnitude_alvo: floa
     """
     parametros = validar_parametros(algoritmo, parametros)
 
-    queryset = Terremoto.objects.all()
+    queryset = _base(magnitude_alvo)
     if anos:
         mais_recente = queryset.order_by("-data_hora").values_list("data_hora", flat=True).first()
         if mais_recente:
@@ -441,7 +459,7 @@ def prever(modelo: ModeloTreinado, latitude: float | None = None,
     Com latitude e longitude, devolve só a célula que contém o ponto.
     """
     salvo = _carregar(modelo)
-    df = _dataframe(Terremoto.objects.all())
+    df = _dataframe(_base(modelo.magnitude_alvo))
     painel, referencia = montar_painel(df, modelo.magnitude_alvo, modelo.tamanho_celula,
                                        incluir_proximo=True)
     futuro = painel[painel["periodo"] == painel["periodo"].max()].copy()
