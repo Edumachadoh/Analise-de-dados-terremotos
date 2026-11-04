@@ -61,12 +61,12 @@ export function Filtros({ filtros, aoAplicar }) {
       <h3>Filtros</h3>
 
       <label className="campo">
-        Magnitude (mínima e máxima)
+        Magnitude
         <div className="par">{numero('magnitude_min', 'mín.', 0.1)}{numero('magnitude_max', 'máx.', 0.1)}</div>
       </label>
 
       <label className="campo">
-        Profundidade em km (mínima e máxima)
+        Profundidade em km
         <div className="par">{numero('profundidade_min', 'mín.', 1)}{numero('profundidade_max', 'máx.', 1)}</div>
       </label>
 
@@ -92,9 +92,9 @@ export function Filtros({ filtros, aoAplicar }) {
         {opcoes('tipo_magnitude', 'Todas')}
       </label>
 
-      <div className="par">
+
         <label className="campo">
-          Mensagem de tsunami
+          Mensagem de tsunami<br></br>
           <select value={rascunho.tsunami} onChange={mudar('tsunami')}>
             <option value="">Todos</option>
             <option value="true">Sim</option>
@@ -105,10 +105,10 @@ export function Filtros({ filtros, aoAplicar }) {
           Nível de alerta
           {opcoes('alerta', 'Todos')}
         </label>
-      </div>
+
 
       <label className="campo">
-        Local contém o texto
+        Local
         <input type="text" placeholder="ex.: Valparaíso" value={rascunho.local} onChange={mudar('local')} />
       </label>
 

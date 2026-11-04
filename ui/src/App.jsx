@@ -51,7 +51,7 @@ export default function App() {
             <path d="M2 16h6l3-8 5 16 4-12 3 4h7" fill="none" stroke="currentColor" strokeWidth="3"
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Terremotos por região
+          Análise de Terremotos
         </div>
 
         <nav className="nav">
