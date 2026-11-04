@@ -12,7 +12,7 @@ import { useCarregar } from '../lib/useCarregar.js'
 import { MUNDO } from './Regioes.jsx'
 
 const TAMANHO_PAGINA = 50 // o mesmo PAGE_SIZE do back
-const FORMATOS_ACEITOS = '.csv' // a rota /coletas/upload/ do back lê só CSV
+const FORMATOS_ACEITOS = '.csv,.json,.xml'
 
 // Colunas da tabela. `ordena` é o campo aceito em ?ordering= (o back só ordena por estes três).
 const COLUNAS = [
@@ -196,7 +196,7 @@ function Importacao({ regiao, aoImportar }) {
         {ocupado?.startsWith('Buscando') && <p className="texto-explicacao">{ocupado}</p>}
       </Cartao>
 
-      <Cartao titulo="Enviar um arquivo" subtitulo="CSV com as colunas do USGS: id, mag, time, latitude, longitude e depth">
+      <Cartao titulo="Enviar um arquivo" subtitulo="CSV, JSON (inclusive GeoJSON) ou XML com as colunas do USGS: id, mag, time, latitude, longitude e depth">
         <div
           className={`upload${arrastando ? ' arrastando' : ''}`}
           onClick={() => entrada.current.click()}

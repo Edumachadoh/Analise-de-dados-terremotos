@@ -1,4 +1,4 @@
-# Casos de teste do upload de CSV
+# Casos de teste do upload (CSV, JSON e XML)
 
 Arquivos para testar manualmente o endpoint `POST /api/coletas/upload/`.
 
@@ -22,6 +22,9 @@ Envie **na ordem dos números**: o caso 03 depende do 01 já ter sido enviado.
 | `04_colunas_extras_ignoradas.csv` | colunas a mais (`pais`, `observacao`) | aceito; colunas extras ignoradas |
 | `05_so_colunas_obrigatorias.csv` | só `id, mag, time, latitude, longitude, depth` | novos: 1 |
 | `06_extensao_maiuscula.CSV` | extensão `.CSV` em maiúsculas | aceito |
+| `19_lista_de_registros.json` | JSON: lista de registros com as colunas do USGS | novos: 2 |
+| `20_geojson_usgs.json` | GeoJSON do USGS (`id`, `properties` e `coordinates`) | novos: 2 |
+| `21_valido.xml` | XML: um elemento por terremoto | novos: 2 |
 | `01_valido.csv` com `magnitude_minima=5.0` | filtro de magnitude configurável | 1 recebido, 2 descartados |
 
 ## Linhas descartadas (201, com aviso)
@@ -45,11 +48,11 @@ O arquivo é aceito, mas as linhas ruins não entram. A quantidade aparece no ca
 | `14_encoding_latin1.csv` | salvo em Latin-1, não UTF-8 | `Não foi possível ler o CSV: 'utf-8' codec can't decode...` |
 | `15_vazio.csv` | arquivo de 0 bytes | `O arquivo submetido está vázio.` |
 | `16_texto_qualquer.csv` | texto que não é CSV de terremotos | `Colunas ausentes no CSV: [...]` (todas) |
-| `17_formato_json.json` | extensão `.json` | `Formato .json não aceito. Envie: .csv.` |
-| `18_formato_txt.txt` | extensão `.txt`, mesmo com conteúdo de CSV válido | `Formato .txt não aceito. Envie: .csv.` |
+| `17_formato_json.json` | JSON sem as colunas `time`, `latitude`, `longitude` e `depth` | `Colunas ausentes no JSON: [...]` |
+| `18_formato_txt.txt` | extensão `.txt`, mesmo com conteúdo de CSV válido | `Formato .txt não aceito. Envie: .csv, .json, .xml.` |
 | `01_valido.csv` com `magnitude_minima=20` | magnitude fora da faixa | `Certifique-se de que este valor seja inferior ou igual a 10.` |
 
-Nos casos 10 a 14 e 16, o arquivo chegou a ser lido: a coleta fica registrada em `GET /api/coletas/` com `status: "erro"` e a mensagem. Nos casos 15, 17, 18 e na magnitude inválida, a validação barra antes, e nenhuma coleta é criada.
+Nos casos 10 a 14, 16 e 17, o arquivo chegou a ser lido: a coleta fica registrada em `GET /api/coletas/` com `status: "erro"` e a mensagem. Nos casos 15, 18 e na magnitude inválida, a validação barra antes, e nenhuma coleta é criada.
 
 ## Limpar depois dos testes
 

@@ -178,9 +178,9 @@ class ColetaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
             parser_classes=[MultiPartParser, FormParser], serializer_class=UploadCsvSerializer)
     def upload(self, request):
         """
-        Importa um CSV enviado pelo usuário (multipart/form-data).
+        Importa um arquivo .csv, .json ou .xml enviado pelo usuário (multipart/form-data).
 
-        Campos: arquivo (CSV com as colunas do USGS) e magnitude_minima (opcional).
+        Campos: arquivo (com as colunas do USGS) e magnitude_minima (opcional).
         Eventos já existentes são atualizados pelo id, não duplicados.
         """
         entrada = UploadCsvSerializer(data=request.data)

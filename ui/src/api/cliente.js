@@ -81,6 +81,8 @@ export const apiTerremoto = {
   // Busca no USGS os terremotos do mundo inteiro; pode levar alguns minutos
   importarMundo: (anos, magnitudeMinima) => requisitar('/coletas/', postJson({ anos, magnitude_minima: magnitudeMinima })),
 
+  // .csv, .json (inclusive GeoJSON) ou .xml, com as colunas do USGS. Cada caso (coluna faltando, linhas inválidas, encoding...) e o que a tela
+  // mostra estão no README, seção "Upload de arquivos: como se comporta".
   enviarArquivo(arquivo) {
     const formulario = new FormData()
     formulario.append('arquivo', arquivo)

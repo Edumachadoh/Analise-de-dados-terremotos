@@ -6,8 +6,11 @@ objetos Terremoto e grava no banco. Cada importação gera um registro de Coleta
 com a contagem de eventos novos e atualizados.
 """
 
+import io
+import json
 import math
 from pathlib import Path
+from xml.etree.ElementTree import ParseError
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -28,7 +31,7 @@ CAMPOS_ATUALIZAVEIS = [
 
 LOTE_CONSULTA = 10_000  # ids por consulta ao verificar quais eventos já existem
 
-# Colunas que um CSV precisa ter para ser importado (nomes do USGS)
+# Colunas que o arquivo enviado precisa ter para ser importado (nomes do USGS)
 COLUNAS_OBRIGATORIAS = {"id", "mag", "time", "latitude", "longitude", "depth"}
 
 
@@ -191,22 +194,62 @@ def importar_do_usgs(anos: int, magnitude_minima: float | None = None,
     )
 
 
-def ler_csv(arquivo, magnitude_minima: float | None = None) -> tuple[list[dict], int]:
+FORMATOS = (".csv", ".json", ".xml")
+
+
+def _bytes(arquivo) -> bytes:
+    """Conteúdo do arquivo, seja um caminho ou um arquivo enviado pela API."""
+    return arquivo.read() if hasattr(arquivo, "read") else Path(arquivo).read_bytes()
+
+
+def _tabela_json(arquivo) -> pd.DataFrame:
     """
-    Lê um CSV com as colunas do USGS (as mesmas de data/raw/) e devolve
-    (registros válidos, quantidade de linhas descartadas).
+    Aceita três formas de JSON:
+    - GeoJSON do USGS ({"features": [...]}): junta properties, id e coordenadas
+      (longitude, latitude, profundidade);
+    - uma lista de registros ([{"id": ..., "mag": ...}, ...]);
+    - um objeto que guarda a lista em algum campo ({"dados": [...]}).
+    """
+    dados = json.loads(_bytes(arquivo))
+    if isinstance(dados, dict) and isinstance(dados.get("features"), list):
+        linhas = []
+        for feature in dados["features"]:
+            propriedades = dict(feature.get("properties") or {})
+            coordenadas = (feature.get("geometry") or {}).get("coordinates") or []
+            linha = {"id": feature.get("id", propriedades.get("id")), **propriedades}
+            linha.update(zip(("longitude", "latitude", "depth"), coordenadas))
+            linhas.append(linha)
+        return pd.DataFrame(linhas)
+    if isinstance(dados, dict):
+        dados = next((v for v in dados.values() if isinstance(v, list)), [dados])
+    return pd.json_normalize(dados)
+
+
+def ler_arquivo(arquivo, magnitude_minima: float | None = None,
+                nome: str | None = None) -> tuple[list[dict], int]:
+    """
+    Lê um arquivo .csv, .json ou .xml com as colunas do USGS (as mesmas de
+    data/raw/) e devolve (registros válidos, quantidade de linhas descartadas).
+    O formato vem da extensão do `nome` (ou do caminho, se `arquivo` for um).
 
     Descarta as linhas sem os campos obrigatórios, com coordenadas fora da faixa
     ou abaixo da magnitude mínima. Erros de formato viram ValueError.
     """
+    extensao = Path(nome or str(arquivo)).suffix.lower()
+    formato = extensao.lstrip(".").upper()
     try:
-        df = pd.read_csv(arquivo)
-    except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as erro:
-        raise ValueError(f"Não foi possível ler o CSV: {erro}") from erro
+        if extensao == ".json":
+            df = _tabela_json(arquivo)
+        elif extensao == ".xml":
+            df = pd.read_xml(io.BytesIO(_bytes(arquivo)), parser="etree")  # etree vem com o Python
+        else:
+            df = pd.read_csv(arquivo)
+    except (ValueError, ParseError) as erro:  # ParserError, EmptyDataError e JSONDecodeError são ValueError
+        raise ValueError(f"Não foi possível ler o {formato}: {erro}") from erro
 
     faltando = COLUNAS_OBRIGATORIAS - set(df.columns)
     if faltando:
-        raise ValueError(f"Colunas ausentes no CSV: {sorted(faltando)}")
+        raise ValueError(f"Colunas ausentes no {formato}: {sorted(faltando)}")
 
     total = len(df)
     df = df.dropna(subset=sorted(COLUNAS_OBRIGATORIAS))
@@ -229,15 +272,15 @@ def ler_csv(arquivo, magnitude_minima: float | None = None) -> tuple[list[dict],
 def importar_csv(arquivo, anos: int = 0, magnitude_minima: float | None = None,
                  nome: str | None = None) -> Coleta:
     """
-    Importa um CSV com as colunas do USGS. `arquivo` pode ser um caminho
-    (comando importar_terremotos) ou um arquivo enviado pela API (upload).
+    Importa um arquivo .csv, .json ou .xml com as colunas do USGS. `arquivo` pode
+    ser um caminho (comando importar_terremotos) ou um arquivo enviado pela API (upload).
     """
     nome = nome or Path(str(arquivo)).name
     coleta = Coleta.objects.create(anos=max(anos, 1), magnitude_minima=magnitude_minima,
                                    origem=nome[:20])
 
     def ler():
-        registros, descartados = ler_csv(arquivo, magnitude_minima)
+        registros, descartados = ler_arquivo(arquivo, magnitude_minima, nome)
         if descartados:
             coleta.mensagem = f"{descartados} linha(s) descartada(s) por dados inválidos, " \
                               "tipo diferente de terremoto ou magnitude abaixo da mínima."

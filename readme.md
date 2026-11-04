@@ -11,14 +11,14 @@ O projeto tem duas partes que conversam **somente por uma API REST**:
 │   ├── api/, config/         #   a API: modelos, rotas, serviços de USGS, estatísticas e machine learning
 │   ├── data/                 #   polígonos das regiões (Natural Earth), CSV de exemplo e casos de teste do upload
 │   └── scripts/              #   arquivos vazios, não implementados
-├── ui/                       # interface web (React + Vite); veja ui/README.md
+├── ui/                       # interface web (React + Vite): veja a seção Front-end abaixo
 └── readme.md
 ```
 
 - **Para rodar o back e o front juntos**, siga [Como rodar o projeto](#como-rodar-o-projeto).
 - **Para entender o código da API**, veja [Arquivos da API](#arquivos-da-api) e [Fluxo de uma requisição](#fluxo-de-uma-requisição).
 - **Para entender a divisão em continentes e oceanos**, veja [Regiões](#regiões-continentes-e-oceanos).
-- **Para a interface**, veja [Interface](#interface).
+- **Para a interface**, veja [Front-end (interface)](#front-end-interface).
 
 ---
 
@@ -27,14 +27,15 @@ O projeto tem duas partes que conversam **somente por uma API REST**:
 1. [Como rodar o projeto](#como-rodar-o-projeto)
 2. [Comandos da base de dados](#comandos-da-base-de-dados)
 3. [Endpoints da API](#endpoints-da-api)
-4. [Dados na API](#dados-na-api)
-5. [Regiões: continentes e oceanos](#regiões-continentes-e-oceanos)
-6. [Arquivos da API](#arquivos-da-api)
-7. [Fluxo de uma requisição](#fluxo-de-uma-requisição)
-8. [Interface](#interface)
-9. [Testes](#testes)
-10. [Dados utilizados](#dados-utilizados)
-11. [Limitações dos dados](#limitações-dos-dados)
+4. [Front-end (interface)](#front-end-interface)
+5. [Upload de arquivos: como se comporta](#upload-de-arquivos-como-se-comporta)
+6. [Dados na API](#dados-na-api)
+7. [Regiões: continentes e oceanos](#regiões-continentes-e-oceanos)
+8. [Arquivos da API](#arquivos-da-api)
+9. [Fluxo de uma requisição](#fluxo-de-uma-requisição)
+10. [Testes](#testes)
+11. [Dados utilizados](#dados-utilizados)
+12. [Limitações dos dados](#limitações-dos-dados)
 
 ---
 
@@ -146,7 +147,7 @@ npm run dev
 
 A interface fica em `http://localhost:5173`. As chamadas para `/api` são repassadas pelo Vite para `http://127.0.0.1:8000`, então **a API precisa estar rodando** (a interface não tem mais uma fonte própria de dados). Se a API estiver em outro endereço, copie `ui/.env.example` para `ui/.env` e ajuste `VITE_API_URL`.
 
-Na primeira abertura, a tela **Regiões** mostra o mapa. Escolha uma região que já tem terremotos e clique em "Analisar", ou escolha uma sem dados e clique em "Buscar no USGS".
+Na primeira abertura, a tela **Regiões** mostra o mapa, e o Painel e a tela Dados já analisam o mundo inteiro. Escolha uma região que já tem terremotos e clique em "Analisar", ou escolha uma sem dados e clique em "Buscar no USGS". Com o banco vazio, importe pela tela **Dados** ("Buscar no USGS" ou "Enviar um arquivo").
 
 ### 4. Treinar o primeiro modelo
 
@@ -217,7 +218,7 @@ curl -F "arquivo=@data/terremotos_global_m2.5_6a3anos.csv" http://127.0.0.1:8000
 python manage.py importar_terremotos --arquivo data/terremotos_global_m2.5_6a3anos.csv
 ```
 
-O CSV precisa ter as colunas do USGS. São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth`; as demais são opcionais. A coluna `time` pode vir em milissegundos (como na API do USGS) ou como data ISO (como nos CSVs gerados pelo `baixar_csv` e no CSV baixado do site do USGS). Linhas inválidas, de outro tipo de evento (`type` diferente de `earthquake`) ou abaixo da magnitude mínima (padrão 2,5) são descartadas, e a quantidade aparece na `mensagem` da coleta. Um CSV não precisa de região: cada terremoto gravado recebe a região a que pertence pelas coordenadas.
+O arquivo (CSV, JSON ou XML) precisa ter as colunas do USGS. São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth`; as demais são opcionais. A coluna `time` pode vir em milissegundos (como na API do USGS) ou como data ISO (como nos CSVs gerados pelo `baixar_csv` e no CSV baixado do site do USGS). Linhas inválidas, de outro tipo de evento (`type` diferente de `earthquake`) ou abaixo da magnitude mínima (padrão 2,5) são descartadas, e a quantidade aparece na `mensagem` da coleta. Um arquivo não precisa de região: cada terremoto gravado recebe a região a que pertence pelas coordenadas.
 
 ### Exemplo: montar uma base de 6 anos
 
@@ -341,11 +342,11 @@ GET /api/terremotos/?regiao=asia&data_inicio=2025-01-01&data_fim=2025-12-31&orde
 {"anos": 3, "magnitude_minima": 4.0}
 ```
 
-Sem `magnitude_minima`, vale a magnitude de completude da região. **`POST /api/coletas/`** continua baixando o mundo inteiro (corpo `{"anos": 3, "magnitude_minima": 2.5}`). **`POST /api/coletas/upload/`**: envia um CSV, em `multipart/form-data`:
+Sem `magnitude_minima`, vale a magnitude de completude da região. **`POST /api/coletas/`** continua baixando o mundo inteiro (corpo `{"anos": 3, "magnitude_minima": 2.5}`). **`POST /api/coletas/upload/`**: envia um arquivo `.csv`, `.json` (inclusive GeoJSON) ou `.xml`, em `multipart/form-data`:
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
-| `arquivo` | sim | `.csv` com as colunas do USGS, até 50 MB |
+| `arquivo` | sim | `.csv`, `.json` ou `.xml` com as colunas do USGS, até 50 MB |
 | `magnitude_minima` | não | padrão 2,5 |
 
 As três respondem com o registro da coleta:
@@ -416,6 +417,111 @@ GET /api/previsoes/?latitude=35.7&longitude=139.7     # a célula de Tóquio
 ```
 
 Cada célula da resposta traz os limites de latitude e longitude, o centro, a `probabilidade`, os eventos dos últimos 12 períodos e a taxa histórica. Status: 404 quando ainda não há modelo treinado, 400 para parâmetros inválidos.
+
+---
+
+## Front-end (interface)
+
+Interface em React + Vite, na pasta `ui/`. Ela conversa **somente com a API REST do back**, então o back precisa estar rodando. Para rodar, veja [Como rodar o projeto](#como-rodar-o-projeto). Em desenvolvimento, o Vite repassa tudo que começa com `/api` para `http://127.0.0.1:8000`, então não precisa configurar CORS; se o back estiver em outro endereço, copie `ui/.env.example` para `ui/.env` e ajuste `VITE_API_URL`.
+
+### Telas
+
+A interface analisa **uma região por vez**: o mundo inteiro (a escolha inicial), um dos 7 continentes ou um dos 5 oceanos (veja [Regiões](#regiões-continentes-e-oceanos)). Todas as telas ficam disponíveis desde o início, mesmo com o banco vazio.
+
+| Tela | O que mostra |
+|---|---|
+| **Regiões** | um mapa com os continentes (e a faixa de mar junto à costa) e os oceanos, e, ao lado dele, o painel da região escolhida (botão **Analisar**, importação do USGS) e a lista com o mundo inteiro e todas as regiões, com a quantidade de terremotos. Sem regiões cadastradas, um aviso pede para rodar `carregar_regioes` |
+| **Painel** | terremotos com M ≥ 4 (a magnitude de completude; o aviso no topo diz quantos ficaram de fora), em três etapas. **Localização:** mapa dos epicentros, agrupados em bolhas que se separam com o zoom (a cor da bolha é a maior magnitude do grupo), e terremotos por país. **Magnitude:** terremotos por magnitude mínima, mensagem de tsunami e faixa de profundidade. **Tempo:** terremotos por mês e poder de previsão (AUC) de cada janela de histórico do ML |
+| **Dados** | busca de dados novos no USGS (da região, ou do mundo inteiro), envio de arquivo, tabela paginada e ordenável, histórico de importações e matriz de correlação de Pearson (terremotos com M ≥ 4) |
+
+Os **filtros** da barra lateral (magnitude, profundidade, período, escala, tsunami, alerta e local) valem para
+Painel e Dados ao mesmo tempo. Trocar de região limpa os filtros. A região escolhida vai em todas as consultas
+como `?regiao=<codigo>`; no mundo inteiro, as consultas vão sem região.
+
+Só o **nome das colunas** é traduzido para a tela, em [`ui/src/lib/rotulos.js`](ui/src/lib/rotulos.js); os valores aparecem
+como vêm da API (`mb`, `raso`, `reviewed`…).
+
+> As telas **Modelos** e **Previsões** existem em `ui/src/paginas/`, mas estão desativadas em `ui/src/App.jsx` (comentadas) e não usam as regiões.
+
+O mapa da tela Regiões ([`MapaRegioes.jsx`](ui/src/componentes/MapaRegioes.jsx)) desenha, sobre o OpenStreetMap, três camadas vindas de `GET /api/regioes/mapa/`: os oceanos, a faixa de mar em volta de cada continente e os continentes. São os mesmos polígonos que o back usa para decidir a região de cada terremoto.
+
+### De onde vêm os dados
+
+Tudo vem da API do back, por [`ui/src/api/cliente.js`](ui/src/api/cliente.js). As telas importam `api` de
+[`ui/src/api/index.js`](ui/src/api/index.js) e não sabem como a requisição é feita. Não há uma fonte "USGS direto"
+no navegador: o USGS é consultado pelo back, que grava os terremotos no banco.
+
+Pontos da API que a interface usa e vale conhecer:
+
+- **Regiões.** `GET /api/regioes/` (lista com a contagem de terremotos), `GET /api/regioes/mapa/` (polígonos) e
+  `POST /api/regioes/{codigo}/importar/` (busca no USGS; pode levar alguns minutos). No mundo inteiro, a busca usa `POST /api/coletas/`.
+- **Tamanho de página.** `?page_size=` é aceito (até 5.000); o mapa baixa todos os terremotos da região em poucas requisições.
+- **Estatísticas.** O Painel e a tela Dados usam `GET /api/estatisticas/…` (resumo, por mês, por profundidade, janelas e correlação).
+- **Envio de arquivo.** `POST /api/coletas/upload/` (veja [Upload de arquivos](#upload-de-arquivos-como-se-comporta)).
+
+### Estrutura do front-end
+
+```
+ui/src/
+├── api/
+│   ├── index.js              # ponto único de acesso à API
+│   ├── cliente.js            # chamadas HTTP ao back (regiões, terremotos, estatísticas, coletas, modelos, previsões)
+│   └── erro.js               # ErroApi
+├── componentes/              # cartões, filtros, gráficos (Recharts), mapa dos epicentros e mapa das regiões (Leaflet)
+├── lib/
+│   ├── rotulos.js            # tradução dos nomes das colunas
+│   ├── formato.js            # números e datas em português
+│   ├── useCarregar.js        # busca na API com estado de carregamento e erro
+│   ├── useTodosTerremotos.js # junta as páginas de terremotos da região, com progresso e cache
+│   └── analise.js            # análises do Painel calculadas no navegador
+├── paginas/                  # Regioes, Painel, Dados (Modelos e Previsoes existem, mas estão desligadas)
+└── App.jsx                   # navegação, região escolhida e filtros compartilhados
+```
+
+Bibliotecas: [React](https://react.dev) + [Vite](https://vite.dev), [Recharts](https://recharts.org) (gráficos),
+[React Leaflet](https://react-leaflet.js.org) (mapas, com fundo do OpenStreetMap) e
+[leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) (agrupamento dos epicentros no mapa).
+
+---
+
+## Upload de arquivos: como se comporta
+
+Na tela **Dados → Enviar um arquivo** (clique ou arraste), o front chama `POST /api/coletas/upload/`
+(multipart, campo `arquivo`). O back lê **`.csv`, `.json` (inclusive GeoJSON) e `.xml`, até 50 MB**. Os terremotos do arquivo são **somados** à base: o `id` do USGS
+identifica cada evento, então reenviar o mesmo evento o atualiza em vez de duplicar. Os casos de teste, com os arquivos
+prontos, estão em [`backend/data/testes_upload/LEIAME.md`](backend/data/testes_upload/LEIAME.md).
+
+**Colunas.** São obrigatórias `id`, `mag`, `time`, `latitude`, `longitude` e `depth` (os nomes do USGS, em minúsculas).
+Colunas a mais são ignoradas. `time` pode ser milissegundos ou data ISO. O CSV precisa ser UTF-8 e separado por vírgula.
+
+**Formatos aceitos** (cada um vale também para o comando `importar_terremotos --arquivo`):
+- **CSV:** uma linha por terremoto, com cabeçalho.
+- **JSON:** uma lista de registros (`[{"id": ..., "mag": ...}]`), um objeto com a lista dentro de algum campo, ou o GeoJSON do USGS (`{"features": [...]}`), de onde saem o `id`, as `properties` e as coordenadas (longitude, latitude, profundidade).
+- **XML:** um elemento por terremoto, com as colunas como elementos filhos (`<evento><id>..</id><mag>..</mag>...</evento>`).
+
+**Magnitude mínima.** O front não envia `magnitude_minima`, então vale o padrão do back (2,5): terremotos abaixo disso são
+descartados.
+
+| O que acontece | Resposta do back | O que a tela mostra |
+|---|---|---|
+| Arquivo válido | 201 | Aviso verde: "Importação concluída: X recebidos, Y novos e Z atualizados." |
+| Reenvio de eventos que já existem | 201 | Os eventos contam como "atualizados"; nada é duplicado |
+| Colunas extras no arquivo | 201 | Aceito; as colunas extras são ignoradas |
+| Algumas linhas inválidas (latitude fora da faixa, magnitude vazia ou com texto, data inválida, tipo diferente de terremoto, magnitude abaixo da mínima, id repetido no arquivo) | 201 | Importa as linhas boas e descarta as ruins. Aviso verde com as contagens, e a quantidade descartada aparece na coluna **Mensagem** do histórico |
+| Só o cabeçalho, sem linhas | 201 | "0 recebidos, 0 novos e 0 atualizados" |
+| **Coluna obrigatória faltando** ou com nome errado (ex.: `latitud`) | 400, com a coleta registrada como `erro` | Aviso vermelho: "Colunas ausentes no CSV: ['mag']" (ou "no JSON" / "no XML"; lista todas as que faltam). A importação aparece no histórico com situação `erro` |
+| Separador `;` (padrão do Excel em português) | 400, coleta `erro` | Aviso vermelho de colunas ausentes (o back não reconhece o separador) |
+| Texto que não é um CSV de terremotos | 400, coleta `erro` | Aviso vermelho de colunas ausentes |
+| Arquivo em Latin-1 (não UTF-8) | 400, coleta `erro` | Aviso vermelho: "Não foi possível ler o CSV…" |
+| JSON ou XML malformado (chave sem fechar, tag sem fechar) | 400, coleta `erro` | Aviso vermelho: "Não foi possível ler o JSON…" (ou "XML") |
+| Arquivo vazio (0 bytes) | 400, sem registrar coleta | Aviso vermelho: "arquivo: O arquivo submetido está vázio." |
+| Extensão que não é `.csv`, `.json` ou `.xml` (ex.: `.txt`) | 400, sem registrar coleta | Aviso vermelho: "arquivo: Formato .txt não aceito. Envie: .csv, .json, .xml." |
+| Arquivo maior que 50 MB | 400, sem registrar coleta | Aviso vermelho: "arquivo: Arquivo maior que 50 MB." |
+| Back desligado | sem resposta | "Não foi possível conectar à API. O back-end está rodando (python manage.py runserver)?" |
+
+Quando o erro acontece **depois** de o arquivo ser lido (colunas ausentes, encoding), o back guarda a tentativa no histórico de
+importações com `status: erro`; quando a validação barra **antes** (extensão, tamanho, arquivo vazio), nada é registrado.
+O front mostra, nos dois casos, só o texto do erro (veja `mensagemDeErro` em `ui/src/api/cliente.js`).
 
 ---
 
@@ -631,20 +737,6 @@ Os outros endpoints seguem o mesmo caminho, trocando o serviço: a importação 
 
 ---
 
-## Interface
-
-A interface (`ui/`, React + Vite; detalhes em [`ui/README.md`](ui/README.md)) fala só com a API e analisa **uma região por vez**:
-
-| Tela | O que mostra |
-|---|---|
-| **Regiões** | tela inicial: um mapa com os continentes (e a faixa de mar junto à costa) e os oceanos, e, ao lado dele, o painel da região escolhida (botão Analisar e importação do USGS) e a lista de todas as regiões, com a contagem de terremotos. Dali se escolhe a região, se analisa e se importam dados do USGS |
-| **Painel** | terremotos com M ≥ 4 (a magnitude de completude; o aviso no topo diz quantos ficaram de fora), em três etapas. **Localização:** mapa dos epicentros, agrupados em bolhas que se separam com o zoom (a cor da bolha é a maior magnitude do grupo), e terremotos por país. **Magnitude:** terremotos por magnitude mínima, mensagem de tsunami e faixa de profundidade. **Tempo:** terremotos por mês e poder de previsão de cada janela de histórico do ML |
-| **Dados** | matriz de correlação de Pearson (terremotos com M ≥ 4), tabela paginada, histórico de importações da região, busca no USGS e envio de CSV |
-
-Os filtros da barra lateral valem para Painel e Dados; a região escolhida vai junto em todas as consultas como `?regiao=`. O mapa da tela Regiões vem de `GET /api/regioes/mapa/`, os mesmos polígonos que o back usa para classificar os terremotos. As telas Modelos e Previsões continuam desligadas no menu, como estavam, e não usam as regiões.
-
----
-
 ## Testes
 
 ### Testes automatizados
@@ -678,13 +770,13 @@ São **47 testes**, em nove grupos:
 
 ### Testes manuais do upload
 
-A pasta `backend/data/testes_upload/` tem 18 arquivos para testar o `POST /api/coletas/upload/` à mão, com a API rodando. O resultado esperado de cada um está em [`data/testes_upload/LEIAME.md`](backend/data/testes_upload/LEIAME.md).
+A pasta `backend/data/testes_upload/` tem 21 arquivos para testar o `POST /api/coletas/upload/` à mão, com a API rodando. O resultado esperado de cada um está em [`data/testes_upload/LEIAME.md`](backend/data/testes_upload/LEIAME.md).
 
 | Grupo | Arquivos | Resultado |
 |---|---|---|
-| Aceitos | `01` a `06` | 201: válido, `time` em data ISO, reenvio que atualiza, colunas extras ignoradas, só as colunas obrigatórias, extensão `.CSV` |
+| Aceitos | `01` a `06`, `19` a `21` | 201: válido, `time` em data ISO, reenvio que atualiza, colunas extras ignoradas, só as colunas obrigatórias, extensão `.CSV`, JSON em lista, GeoJSON e XML |
 | Aceitos com linhas descartadas | `07` a `09` | 201 com aviso na `mensagem`: linhas inválidas, ids duplicados, arquivo só com cabeçalho |
-| Rejeitados | `10` a `18` | 400: coluna faltando, nome de coluna errado, separador `;`, encoding Latin-1, arquivo vazio, texto qualquer, `.json`, `.txt` |
+| Rejeitados | `10` a `18` | 400: coluna faltando, nome de coluna errado, separador `;`, encoding Latin-1, arquivo vazio, texto qualquer, JSON sem as colunas obrigatórias, `.txt` |
 
 **Diferente dos automatizados, estes testes gravam no banco real** quando enviados à API em execução. Os terremotos de teste têm o id começando com `teste_`, para serem fáceis de remover:
 
