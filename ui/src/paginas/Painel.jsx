@@ -106,7 +106,7 @@ function Analise({ filtros, periodo, versaoBase }) {
 
       <CartaoMapa dados={eventos.itens} chave={`${filtros.regiao}-${eventos.total}`} />
 
-      <Cartao largo titulo="Terremotos por país" subtitulo={`Top ${TOP_PAISES}`}>
+      <Cartao largo titulo="Terremotos por país" subtitulo={`Os ${TOP_PAISES} com mais terremotos`}>
         <BarrasHorizontais dados={a.porPais} rotuloValor="Terremotos" formatar={formatarInteiro} larguraRotulo={140}
           extras={(d) => [['Magnitude média', formatarNumero(d.magnitude_media)]]} />
       </Cartao>
@@ -139,7 +139,7 @@ function Analise({ filtros, periodo, versaoBase }) {
         ) : <Carregando />}
       </Cartao>
 
-      <Cartao largo titulo="Poder de previsão por janela de histórico"
+      {/* <Cartao largo titulo="Poder de previsão por janela de histórico"
         subtitulo={`AUC de cada feature sozinha para prever M ≥ ${formatarNumero(ALVO)} no período seguinte · 0,5 = chute, 1 = perfeito`}>
         {janelas.erro && <Aviso tipo="erro">{janelas.erro}</Aviso>}
         {janelas.dados?.length === 0 && <Aviso>Dados insuficientes para montar a tabela do modelo.</Aviso>}
@@ -148,7 +148,7 @@ function Analise({ filtros, periodo, versaoBase }) {
             rotuloValor="AUC" formatar={(v) => formatarNumero(v, 2)} larguraRotulo={240} dominio={[0.5, 1]} />
         )}
         {!janelas.dados && !janelas.erro && <Carregando />}
-      </Cartao>
+      </Cartao> */}
     </div>
   )
 }

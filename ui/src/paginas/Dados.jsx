@@ -187,7 +187,7 @@ function Importacao({ regiao, aoImportar }) {
           </label>
           <button className="botao primario" disabled={!!ocupado}
             onClick={() => executar('Buscando no USGS… pode levar alguns minutos', () => (regiao.codigo === MUNDO
-              // no mundo inteiro, sem magnitude o back usaria 2,5: vai a de completude, como nas regiões
+              // no mundo, sem magnitude o back usaria 2,5: vai a de completude, como nas regiões
               ? api.importarMundo(Number(anos), magMinima === '' ? regiao.magnitude_completude : Number(magMinima))
               : api.importarRegiao(regiao.codigo, Number(anos), magMinima === '' ? null : Number(magMinima))))}>
             Buscar no USGS

@@ -45,7 +45,7 @@ export default function CartaoMapa({ dados, chave }) {
       subtitulo={colCor ? `Grupos: quantidade de terremotos · cor pela maior ${rotulo(colCor).toLowerCase()} do grupo` : 'Grupos: quantidade de terremotos'}
       controles={<>
         <Seletor rotulo="Cor por" valor={colCor} opcoes={opcoes} aoMudar={setColCor} />
-        <Seletor rotulo="Tamanho por" valor={colTamanho} opcoes={opcoes} aoMudar={setColTamanho} />
+        <Seletor rotulo="Tamanho unitário por" valor={colTamanho} opcoes={opcoes} aoMudar={setColTamanho} />
       </>}>
       <MapaBase ocupaTela limites={limitesDe(pontos)} chave={chave}>
         <Agrupamento pontos={pontos} colCor={colCor} colTamanho={colTamanho} faixaCor={faixaCor} faixaTamanho={faixaTamanho} />
@@ -60,7 +60,7 @@ export default function CartaoMapa({ dados, chave }) {
               {formatarNumero(faixaCor[0] + i * passo)}–{formatarNumero(faixaCor[0] + (i + 1) * passo)}
             </span>
           ))}
-          {colTamanho && <span>· tamanho do círculo = {rotulo(colTamanho).toLowerCase()}</span>}
+          {colTamanho && <span>· tamanho do círculo sem agrupamento = {rotulo(colTamanho).toLowerCase()}</span>}
         </div>
       )}
     </Cartao>

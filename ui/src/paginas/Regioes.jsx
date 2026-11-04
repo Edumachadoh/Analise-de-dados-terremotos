@@ -8,12 +8,12 @@ import { MapaRegioes } from '../componentes/MapaRegioes.jsx'
 import { formatarInteiro, formatarNumero } from '../lib/formato.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
-// "Mundo inteiro" não é uma região da API: as consultas vão sem ?regiao= (veja App.jsx).
+// "Mundo" não é uma região da API: as consultas vão sem ?regiao= (veja App.jsx).
 // É a escolha inicial do app, e funciona mesmo sem nenhuma região cadastrada no banco.
 export const MUNDO = 'mundo'
 export const REGIAO_MUNDO = {
   codigo: MUNDO,
-  nome: 'Mundo inteiro',
+  nome: 'Mundo',
   tipo: 'mundo',
   total_terremotos: null,
   magnitude_completude: 4, // o mesmo padrão de Regiao.magnitude_completude no back
@@ -53,7 +53,7 @@ export default function Regioes({ regiaoAtual, versaoBase, aoAnalisar, aoMudarBa
       {regioes.dados?.length === 0 && (
         <Aviso>
           Nenhuma região cadastrada. Rode <code>python manage.py carregar_regioes</code> no back para criar os continentes e oceanos.
-          Até lá, use "Mundo inteiro": a importação e o envio de CSV ficam na tela Dados.
+          Até lá, use "Mundo": a importação e o envio de CSV ficam na tela Dados.
         </Aviso>
       )}
 
@@ -105,7 +105,7 @@ function Detalhe({ regiao, aoAnalisar, aoImportar }) {
   if (!regiao) {
     return (
       <Cartao titulo="Nenhuma região escolhida">
-        <p className="texto-explicacao">Escolha o mundo inteiro, um continente ou um oceano para ver quantos terremotos há na base, analisá-lo ou importar dados.</p>
+        <p className="texto-explicacao">Escolha o a opção mundo, um continente ou um oceano para ver quantos terremotos há na base, analisá-lo ou importar dados.</p>
       </Cartao>
     )
   }
