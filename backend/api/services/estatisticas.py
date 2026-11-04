@@ -5,6 +5,7 @@ Cada função recebe um queryset (já filtrado pela view) e devolve dados
 prontos para gráficos: o agrupamento é feito em SQL, não em Python.
 """
 
+import pandas as pd
 from django.db.models import Avg, Case, CharField, Count, Max, Min, Q, Value, When
 from django.db.models.functions import TruncMonth
 from sklearn.metrics import roc_auc_score
@@ -83,6 +84,21 @@ def por_faixa_profundidade(queryset) -> list[dict]:
              "total": por_nome.get(nome, {}).get("total", 0),
              "magnitude_media": _arredondar(por_nome.get(nome, {}).get("magnitude_media"))}
             for nome in ("raso", "intermediario", "profundo")]
+
+
+# Sem a significância: o USGS a calcula a partir da magnitude, e a correlação seria óbvia
+CAMPOS_CORRELACAO = ["magnitude", "profundidade_km", "estacoes", "lacuna_azimutal", "rms"]
+
+
+def correlacao(queryset) -> dict:
+    """
+    Correlação de Pearson entre as colunas numéricas (matriz n x n, None onde não dá para calcular).
+    Cada par usa só os terremotos que têm as duas colunas preenchidas (o USGS nem sempre informa tudo).
+    """
+    df = pd.DataFrame.from_records(queryset.values(*CAMPOS_CORRELACAO), columns=CAMPOS_CORRELACAO).astype(float)
+    matriz = df.corr(min_periods=3).to_numpy()
+    return {"colunas": CAMPOS_CORRELACAO,
+            "valores": [[None if pd.isna(v) else round(float(v), 4) for v in linha] for linha in matriz]}
 
 
 # =============================================================================

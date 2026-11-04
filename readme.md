@@ -287,6 +287,7 @@ Para saber quais ações gravam no banco, veja [O que grava no banco e o que nã
 | GET | `/api/estatisticas/por-mes/` | quantidade e magnitude média de terremotos por mês (gráfico de linha do tempo) |
 | GET | `/api/estatisticas/por-magnitude/` | quantidade por faixa de magnitude (gráfico de barras ou pizza) |
 | GET | `/api/estatisticas/por-profundidade/` | quantidade e magnitude média por faixa de profundidade |
+| GET | `/api/estatisticas/correlacao/` | correlação de Pearson entre magnitude, profundidade, nº de estações, lacuna azimutal e rms |
 | GET | `/api/estatisticas/janelas/` | AUC de cada feature de histórico do ML, sozinha, para prever M ≥ 4,5 (células de 1°) |
 | GET | `/api/estatisticas/casos-positivos/` | fração de célula × período de 30 dias com terremoto ≥ alvo, por magnitude-alvo e tamanho de célula |
 | GET | `/api/coletas/` | histórico de importações: quando, de onde (USGS ou nome do CSV), status e quantos eventos novos e atualizados |
@@ -637,10 +638,10 @@ A interface (`ui/`, React + Vite; detalhes em [`ui/README.md`](ui/README.md)) fa
 | Tela | O que mostra |
 |---|---|
 | **Regiões** | tela inicial: um mapa com os continentes (e a faixa de mar junto à costa) e os oceanos, e, ao lado dele, o painel da região escolhida (botão Analisar e importação do USGS) e a lista de todas as regiões, com a contagem de terremotos. Dali se escolhe a região, se analisa e se importam dados do USGS |
-| **Painel** | totais, terremotos por mês, por faixa de magnitude e de profundidade, correlações, a análise que prepara o ML e os mapas da região (quadrados de 1° e epicentros, com cor e tamanho pela coluna escolhida) |
-| **Dados** | tabela paginada, histórico de importações da região, busca no USGS e envio de CSV |
+| **Painel** | terremotos com M ≥ 4 (a magnitude de completude; o aviso no topo diz quantos ficaram de fora), em três etapas. **Localização:** mapa dos epicentros, agrupados em bolhas que se separam com o zoom (a cor da bolha é a maior magnitude do grupo), e terremotos por país. **Magnitude:** terremotos por magnitude mínima, mensagem de tsunami e faixa de profundidade. **Tempo:** terremotos por mês e poder de previsão de cada janela de histórico do ML |
+| **Dados** | matriz de correlação de Pearson (terremotos com M ≥ 4), tabela paginada, histórico de importações da região, busca no USGS e envio de CSV |
 
-Os filtros da barra lateral valem para Painel e Dados; a região escolhida vai junto em todas as consultas como `?regiao=`. O mapa da tela Regiões vem de `GET /api/regioes/mapa/`, os mesmos polígonos que o back usa para classificar os terremotos. As telas Modelos e Previsões continuam desligadas no menu, como estavam, e não usam as regiões. O gráfico "por região sísmica" do Painel usa caixas próprias (`ui/src/lib/regioesSismicas.js`), independentes das regiões da API.
+Os filtros da barra lateral valem para Painel e Dados; a região escolhida vai junto em todas as consultas como `?regiao=`. O mapa da tela Regiões vem de `GET /api/regioes/mapa/`, os mesmos polígonos que o back usa para classificar os terremotos. As telas Modelos e Previsões continuam desligadas no menu, como estavam, e não usam as regiões.
 
 ---
 

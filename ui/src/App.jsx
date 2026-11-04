@@ -6,28 +6,29 @@ import Dados from './paginas/Dados.jsx'
 import Modelos from './paginas/Modelos.jsx'
 import Painel from './paginas/Painel.jsx'
 import Previsoes from './paginas/Previsoes.jsx'
-import Regioes from './paginas/Regioes.jsx'
+import Regioes, { MUNDO, REGIAO_MUNDO } from './paginas/Regioes.jsx'
 
 const PAGINAS = [
   { id: 'regioes', nome: 'Regiões', icone: 'globo' },
-  // as telas abaixo analisam a região escolhida, então só aparecem depois da escolha
-  { id: 'painel', nome: 'Painel', icone: 'painel', filtros: true, precisaRegiao: true },
-  { id: 'dados', nome: 'Dados', icone: 'dados', filtros: true, precisaRegiao: true },
+  // as telas abaixo analisam a região escolhida (no início, o mundo inteiro)
+  { id: 'painel', nome: 'Painel', icone: 'painel', filtros: true },
+  { id: 'dados', nome: 'Dados', icone: 'dados', filtros: true },
   // { id: 'modelos', nome: 'Modelos', icone: 'modelos' },
   // { id: 'previsoes', nome: 'Previsões', icone: 'previsoes' },
 ]
 
 export default function App() {
   const [pagina, setPagina] = useState('regioes')
-  // O continente ou oceano em análise (objeto de /api/regioes/); todas as consultas levam o código dele
-  const [regiao, setRegiao] = useState(null)
+  // O continente ou oceano em análise (objeto de /api/regioes/); todas as consultas levam o código dele.
+  // No mundo inteiro as consultas vão sem região.
+  const [regiao, setRegiao] = useState(REGIAO_MUNDO)
   // Os filtros valem para Painel e Dados ao mesmo tempo
   const [filtros, setFiltros] = useState(FILTROS_VAZIOS)
   // Muda quando a base muda (importação), para as telas buscarem os dados de novo
   const [versaoBase, setVersaoBase] = useState(0)
 
   const atual = PAGINAS.find((p) => p.id === pagina)
-  const filtrosDaApi = useMemo(() => ({ ...filtros, regiao: regiao?.codigo ?? '' }), [filtros, regiao])
+  const filtrosDaApi = useMemo(() => ({ ...filtros, regiao: regiao.codigo !== MUNDO ? regiao.codigo : '' }), [filtros, regiao])
 
   // A base mudou (importação ou re-treino com dados novos): descarta o que estava em memória
   const aoMudarBase = () => {
@@ -37,7 +38,7 @@ export default function App() {
 
   // Outra região: os filtros da anterior não valem mais
   const analisar = (nova) => {
-    if (nova.codigo !== regiao?.codigo) setFiltros(FILTROS_VAZIOS)
+    if (nova.codigo !== regiao.codigo) setFiltros(FILTROS_VAZIOS)
     setRegiao(nova)
     setPagina('painel')
   }
@@ -54,7 +55,7 @@ export default function App() {
         </div>
 
         <nav className="nav">
-          {PAGINAS.filter((p) => !p.precisaRegiao || regiao).map((p) => (
+          {PAGINAS.map((p) => (
             <button key={p.id} className={pagina === p.id ? 'ativo' : ''} onClick={() => setPagina(p.id)}>
               <Icone nome={p.icone} />
               {p.nome}
@@ -62,20 +63,18 @@ export default function App() {
           ))}
         </nav>
 
-        {regiao && (
-          <div className="regiao-atual">
-            <span>Analisando</span>
-            <strong>{regiao.nome}</strong>
-          </div>
-        )}
+        <div className="regiao-atual">
+          <span>Analisando</span>
+          <strong>{regiao.nome}</strong>
+        </div>
 
-        {regiao && atual.filtros && <Filtros key={regiao.codigo} filtros={filtros} aoAplicar={setFiltros} />}
+        {atual.filtros && <Filtros key={regiao.codigo} filtros={filtros} aoAplicar={setFiltros} />}
       </aside>
 
       <main className="conteudo">
         {pagina === 'regioes' && <Regioes regiaoAtual={regiao} versaoBase={versaoBase} aoAnalisar={analisar} aoMudarBase={aoMudarBase} />}
-        {regiao && pagina === 'painel' && <Painel filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} />}
-        {regiao && pagina === 'dados' && <Dados filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} aoMudarBase={aoMudarBase} />}
+        {pagina === 'painel' && <Painel filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} />}
+        {pagina === 'dados' && <Dados filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} aoMudarBase={aoMudarBase} />}
         {/* {pagina === 'modelos' && <Modelos aoMudarBase={aoMudarBase} />}
         {pagina === 'previsoes' && <Previsoes versaoBase={versaoBase} />} */}
       </main>

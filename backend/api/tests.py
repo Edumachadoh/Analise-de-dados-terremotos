@@ -242,6 +242,13 @@ class EstatisticaTests(TestCase):
         meses = self.cliente.get("/api/estatisticas/por-mes/").json()
         self.assertEqual([m["mes"] for m in meses], ["2026-08", "2026-10"])
 
+    def test_correlacao(self):
+        dados = self.cliente.get("/api/estatisticas/correlacao/").json()
+        self.assertEqual(dados["colunas"], estatisticas.CAMPOS_CORRELACAO)
+        self.assertAlmostEqual(dados["valores"][0][0], 1)
+        self.assertAlmostEqual(dados["valores"][0][1], dados["valores"][1][0])
+        self.assertIsNone(dados["valores"][0][2])  # nenhum evento de teste tem estações
+
     def test_analises_do_ml_sem_dados_suficientes(self):
         self.assertEqual(self.cliente.get("/api/estatisticas/janelas/").json(), [])
         self.assertEqual(self.cliente.get("/api/estatisticas/casos-positivos/").json(), [])
@@ -256,6 +263,12 @@ class AnalisesDoMlTests(TestCase):
         janelas = {j["feature"]: j["auc"] for j in self.cliente.get("/api/estatisticas/janelas/").json()}
         self.assertEqual(list(janelas), estatisticas.JANELAS)
         self.assertTrue(all(0 <= auc <= 1 for auc in janelas.values()))
+
+    def test_janelas_por_faixa_cobrem_a_tabela_do_ml(self):
+        painel, _ = ml.montar_painel(ml._dataframe(Terremoto.objects.all()), 4.5, 1.0)
+        for janela in self.cliente.get("/api/estatisticas/janelas/").json():
+            self.assertEqual(sum(f["linhas"] for f in janela["faixas"]), len(painel))
+            self.assertEqual(sum(f["positivos"] for f in janela["faixas"]), int(painel["alvo"].sum()))
 
     def test_casos_positivos_bate_com_a_tabela_do_ml(self):
         linhas = self.cliente.get("/api/estatisticas/casos-positivos/").json()

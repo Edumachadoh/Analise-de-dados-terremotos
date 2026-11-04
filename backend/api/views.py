@@ -135,6 +135,11 @@ class EstatisticaViewSet(viewsets.ViewSet):
         """Quantidade e magnitude média por faixa de profundidade."""
         return Response(estatisticas.por_faixa_profundidade(self._queryset(request)))
 
+    @action(detail=False, url_path="correlacao")
+    def correlacao(self, request):
+        """Correlação de Pearson entre magnitude, profundidade, estações, lacuna e rms."""
+        return Response(estatisticas.correlacao(self._queryset(request)))
+
     @action(detail=False, url_path="janelas")
     def janelas(self, request):
         """AUC de cada feature de histórico do ML (alvo M >= 4,5, células de 1°)."""

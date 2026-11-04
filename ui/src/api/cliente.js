@@ -71,12 +71,15 @@ export const apiTerremoto = {
   porMes: (filtros) => requisitar(`/estatisticas/por-mes/${consulta(filtros)}`),
   porMagnitude: (filtros) => requisitar(`/estatisticas/por-magnitude/${consulta(filtros)}`),
   porProfundidade: (filtros) => requisitar(`/estatisticas/por-profundidade/${consulta(filtros)}`),
-  // Análises que decidem as escolhas do ML: AUC de cada feature de histórico e casos positivos por alvo e célula
+  // AUC de cada feature de histórico do ML, para o gráfico de janelas do Painel
   janelas: (filtros) => requisitar(`/estatisticas/janelas/${consulta(filtros)}`),
-  casosPositivos: (filtros) => requisitar(`/estatisticas/casos-positivos/${consulta(filtros)}`),
+  // Correlação de Pearson entre as colunas numéricas: { colunas, valores (matriz n×n) }
+  correlacao: (filtros) => requisitar(`/estatisticas/correlacao/${consulta(filtros)}`),
 
   // ---------------------------------------------------------------- coletas
   listarColetas: () => requisitar('/coletas/'),
+  // Busca no USGS os terremotos do mundo inteiro; pode levar alguns minutos
+  importarMundo: (anos, magnitudeMinima) => requisitar('/coletas/', postJson({ anos, magnitude_minima: magnitudeMinima })),
 
   enviarArquivo(arquivo) {
     const formulario = new FormData()

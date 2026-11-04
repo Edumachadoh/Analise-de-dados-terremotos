@@ -56,8 +56,8 @@ Ao abrir, a tela é **Regiões**. Escolhida uma região, as demais telas aparece
 | Tela | O que mostra |
 |---|---|
 | **Regiões** | um mapa com os continentes (e a faixa de mar junto à costa) e os oceanos, e, ao lado dele, o painel da região escolhida (botão **Analisar**, importação do USGS) e a lista de todas as regiões com a quantidade de terremotos. Clicar numa região no mapa ou na lista a escolhe, sem precisar rolar a página |
-| **Painel** | totais, terremotos por mês, por faixa de magnitude e de profundidade, magnitude máxima por mês, correlações e a análise que prepara o ML. Na etapa 1 há dois mapas: o dos quadrados de 1° (as "regiões" do modelo, coloridos pela quantidade de terremotos) e o dos epicentros, com cor e tamanho pela coluna escolhida (padrão: magnitude). O dos epicentros mostra uma amostra de até 3.000 pontos (o cartão avisa quando é amostra); regiões que cruzam a linha de data, como o Pacífico, são desenhadas contínuas, e o enquadramento ignora os pontos mais isolados |
-| **Dados** | tabela paginada e ordenável, histórico de importações, busca de dados novos no USGS e envio de CSV |
+| **Painel** | terremotos com M ≥ 4 (a magnitude de completude; o aviso no topo diz quantos ficaram de fora), em três etapas. **Localização:** mapa dos epicentros, agrupados em bolhas que se separam com o zoom (a cor da bolha é a maior magnitude do grupo), e terremotos por país. **Magnitude:** terremotos por magnitude mínima, mensagem de tsunami e faixa de profundidade. **Tempo:** terremotos por mês, poder de previsão (AUC) de cada janela de histórico do ML e, para a janela escolhida, a chance de terremoto forte em cada faixa de valor |
+| **Dados** | matriz de correlação de Pearson (terremotos com M ≥ 4), tabela paginada e ordenável, histórico de importações, busca de dados novos no USGS e envio de CSV |
 
 Os **filtros** da barra lateral (magnitude, profundidade, período, escala, tsunami, alerta e local) valem para
 Painel e Dados ao mesmo tempo. Trocar de região limpa os filtros. A região escolhida vai em todas as consultas
@@ -103,8 +103,7 @@ ui/src/
 │   ├── formato.js            # números e datas em português
 │   ├── useCarregar.js        # busca na API com estado de carregamento e erro
 │   ├── useTodosTerremotos.js # junta as páginas de terremotos da região, com progresso e cache
-│   ├── analise.js            # análises do Painel que justificam as escolhas do ML
-│   └── regioesSismicas.js    # agrupamento do Painel por região sísmica (caixas próprias, independentes das regiões da API)
+│   └── analise.js            # análises do Painel calculadas no navegador
 ├── paginas/                  # Regioes, Painel, Dados (Modelos e Previsoes existem, mas estão desligadas)
 └── App.jsx                   # navegação, região escolhida e filtros compartilhados
 ```

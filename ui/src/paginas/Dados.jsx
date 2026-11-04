@@ -1,12 +1,15 @@
-// Tela 3: tabela paginada de terremotos (GET /api/terremotos/), histórico de coletas
+// Tela 3: correlação entre as colunas, tabela paginada de terremotos (GET /api/terremotos/), histórico de coletas
 // e importação de dados novos (POST /api/coletas/ busca no USGS; envio de arquivo aguarda o back)
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { api } from '../api/index.js'
 import { Aviso, Cabecalho, Carregando, Cartao, Icone } from '../componentes/comuns.jsx'
+import { comCorte } from '../componentes/Filtros.jsx'
+import { MatrizCorrelacao } from '../componentes/graficos.jsx'
 import { formatarData, formatarInteiro, formatarNumero } from '../lib/formato.js'
 import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
+import { MUNDO } from './Regioes.jsx'
 
 const TAMANHO_PAGINA = 50 // o mesmo PAGE_SIZE do back
 const FORMATOS_ACEITOS = '.csv' // a rota /coletas/upload/ do back lê só CSV
@@ -43,6 +46,9 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
 
   const lista = useCarregar(() => api.listarTerremotos(filtros, pagina, ordenacao), [filtros, pagina, ordenacao, versaoBase])
   const coletas = useCarregar(() => api.listarColetas(), [versaoBase])
+  // A correlação usa o mesmo corte de magnitude do Painel: abaixo dele o catálogo é incompleto
+  const filtrosCorrelacao = useMemo(() => comCorte(filtros, regiao.magnitude_completude), [filtros, regiao])
+  const correlacao = useCarregar(() => api.correlacao(filtrosCorrelacao), [filtrosCorrelacao, versaoBase])
 
   const total = lista.dados?.count ?? 0
   const paginas = Math.max(1, Math.ceil(total / TAMANHO_PAGINA))
@@ -129,6 +135,15 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
             </div>
           )}
         </Cartao>
+
+        <Cartao largo titulo="Correlação entre as variáveis"
+          subtitulo={`Correlação de Pearson · terremotos com magnitude ≥ ${formatarNumero(filtrosCorrelacao.magnitude_min)}`}>
+          {correlacao.erro && <Aviso tipo="erro">{correlacao.erro}</Aviso>}
+          {correlacao.dados && (
+            <MatrizCorrelacao colunas={correlacao.dados.colunas.map((chave) => ({ chave, rotulo: rotulo(chave) }))} valores={correlacao.dados.valores} />
+          )}
+          {!correlacao.dados && !correlacao.erro && <Carregando />}
+        </Cartao>
       </div>
     </>
   )
@@ -171,7 +186,10 @@ function Importacao({ regiao, aoImportar }) {
             <input type="number" step="0.1" min="-2" max="10" placeholder={String(regiao.magnitude_completude)} value={magMinima} onChange={(e) => setMagMinima(e.target.value)} />
           </label>
           <button className="botao primario" disabled={!!ocupado}
-            onClick={() => executar('Buscando no USGS… pode levar alguns minutos', () => api.importarRegiao(regiao.codigo, Number(anos), magMinima === '' ? null : Number(magMinima)))}>
+            onClick={() => executar('Buscando no USGS… pode levar alguns minutos', () => (regiao.codigo === MUNDO
+              // no mundo inteiro, sem magnitude o back usaria 2,5: vai a de completude, como nas regiões
+              ? api.importarMundo(Number(anos), magMinima === '' ? regiao.magnitude_completude : Number(magMinima))
+              : api.importarRegiao(regiao.codigo, Number(anos), magMinima === '' ? null : Number(magMinima))))}>
             Buscar no USGS
           </button>
         </div>

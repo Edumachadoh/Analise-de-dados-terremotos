@@ -52,37 +52,6 @@ export function BarrasHorizontais({ dados, rotuloValor, formatar = formatarNumer
   )
 }
 
-// Duas barras por categoria (ex.: magnitude média e máxima de cada país).
-// series: [{ chave, rotulo }]; a primeira usa a cor 1 e a segunda a cor 2.
-export function BarrasDuplasHorizontais({ dados, series, formatar = formatarNumero, larguraRotulo = 160, extras }) {
-  return (
-    <>
-      <ResponsiveContainer width="100%" height={Math.max(140, dados.length * 44 + 30)}>
-        <BarChart data={dados} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }} barGap={2}>
-          <CartesianGrid stroke="var(--grade)" horizontal={false} />
-          <XAxis type="number" {...EIXO} tickFormatter={formatar} domain={[0, 'auto']} />
-          <YAxis type="category" dataKey="nome" {...EIXO} axisLine={false} width={larguraRotulo} />
-          <Tooltip cursor={CURSOR} content={<DicaRecharts montar={(d) => ({
-            titulo: d.nome,
-            linhas: [...series.map((s) => [s.rotulo, formatar(d[s.chave])]), ...(extras ? extras(d) : [])],
-          })} />} />
-          {series.map((s, i) => (
-            <Bar key={s.chave} dataKey={s.chave} fill={CORES_SERIE[i]} radius={[0, 4, 4, 0]} maxBarSize={16} isAnimationActive={false} />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-      <div className="legenda">
-        {series.map((s, i) => (
-          <span className="item" key={s.chave}>
-            <span className="amostra" style={{ background: CORES_SERIE[i] }} />
-            {s.rotulo}
-          </span>
-        ))}
-      </div>
-    </>
-  )
-}
-
 // Rosca com cor fixa por posição (as fatias vêm sempre na mesma ordem da API)
 export function Rosca({ dados, altura = 230 }) {
   const total = dados.reduce((s, d) => s + d.valor, 0) || 1
@@ -126,37 +95,6 @@ export function Dispersao({ dados, x, y, rotuloX, rotuloY, inverterY = false, al
         <Scatter data={dados} fill="var(--serie-1)" fillOpacity={0.45} isAnimationActive={false} />
       </ScatterChart>
     </ResponsiveContainer>
-  )
-}
-
-// Dispersão com uma cor por grupo (ex.: país). grupos: [{ nome, dados }]; o último pode ser "Outros", em cinza.
-export function DispersaoPorGrupo({ grupos, x, y, rotuloX, rotuloY, inverterY = false, altura = 340, outros }) {
-  const cor = (g, i) => (g.nome === outros ? 'var(--serie-outros)' : CORES_SERIE[i % CORES_SERIE.length])
-  return (
-    <>
-      <ResponsiveContainer width="100%" height={altura}>
-        <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="var(--grade)" />
-          <XAxis type="number" dataKey={x} {...EIXO} domain={['dataMin', 'dataMax']} tickFormatter={(v) => formatarNumero(v)} />
-          <YAxis type="number" dataKey={y} {...EIXO} axisLine={false} width={48} reversed={inverterY}
-            domain={[0, 'dataMax']} tickFormatter={(v) => formatarNumero(v)} />
-          <Tooltip cursor={{ stroke: 'var(--eixo)' }} content={<DicaRecharts montar={(d) => ({
-            titulo: d.local || null, linhas: [[rotuloX, formatarNumero(d[x], 3)], [rotuloY, formatarNumero(d[y], 3)]],
-          })} />} />
-          {grupos.map((g, i) => (
-            <Scatter key={g.nome} name={g.nome} data={g.dados} fill={cor(g, i)} fillOpacity={0.55} isAnimationActive={false} />
-          ))}
-        </ScatterChart>
-      </ResponsiveContainer>
-      <div className="legenda">
-        {grupos.map((g, i) => (
-          <span className="item" key={g.nome}>
-            <span className="amostra" style={{ background: cor(g, i) }} />
-            {g.nome} · {formatarInteiro(g.dados.length)}
-          </span>
-        ))}
-      </div>
-    </>
   )
 }
 

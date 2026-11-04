@@ -8,13 +8,35 @@ import { MapaRegioes } from '../componentes/MapaRegioes.jsx'
 import { formatarInteiro, formatarNumero } from '../lib/formato.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
+// "Mundo inteiro" não é uma região da API: as consultas vão sem ?regiao= (veja App.jsx).
+// É a escolha inicial do app, e funciona mesmo sem nenhuma região cadastrada no banco.
+export const MUNDO = 'mundo'
+export const REGIAO_MUNDO = {
+  codigo: MUNDO,
+  nome: 'Mundo inteiro',
+  tipo: 'mundo',
+  total_terremotos: null,
+  magnitude_completude: 4, // o mesmo padrão de Regiao.magnitude_completude no back
+}
+
+function regiaoMundo(lista) {
+  if (!lista.length) return REGIAO_MUNDO
+  return {
+    ...REGIAO_MUNDO,
+    total_terremotos: lista.reduce((s, r) => s + r.total_terremotos, 0),
+    // o corte mais exigente entre as regiões, para valer em todas
+    magnitude_completude: Math.max(...lista.map((r) => r.magnitude_completude)),
+  }
+}
+
 export default function Regioes({ regiaoAtual, versaoBase, aoAnalisar, aoMudarBase }) {
   const regioes = useCarregar(() => api.listarRegioes(), [versaoBase])
   const poligonos = useCarregar(() => api.mapaRegioes(), []) // só muda se as regiões forem recarregadas
   const [escolhida, setEscolhida] = useState(regiaoAtual?.codigo ?? null)
 
   const lista = regioes.dados ?? []
-  const regiao = lista.find((r) => r.codigo === escolhida)
+  const mundo = regiaoMundo(lista)
+  const regiao = escolhida === MUNDO ? mundo : lista.find((r) => r.codigo === escolhida)
 
   // Em tela estreita o painel da região fica abaixo do mapa: ao escolher, leva a tela até ele
   const painel = useRef(null)
@@ -28,6 +50,12 @@ export default function Regioes({ regiaoAtual, versaoBase, aoAnalisar, aoMudarBa
 
       {regioes.erro && <Aviso tipo="erro">{regioes.erro}</Aviso>}
       {regioes.carregando && !regioes.dados && <Carregando texto="Carregando as regiões…" />}
+      {regioes.dados?.length === 0 && (
+        <Aviso>
+          Nenhuma região cadastrada. Rode <code>python manage.py carregar_regioes</code> no back para criar os continentes e oceanos.
+          Até lá, use "Mundo inteiro": a importação e o envio de CSV ficam na tela Dados.
+        </Aviso>
+      )}
 
       {regioes.dados && (
         <div className="regioes-layout">
@@ -42,6 +70,7 @@ export default function Regioes({ regiaoAtual, versaoBase, aoAnalisar, aoMudarBa
           <div className="regioes-lateral" ref={painel}>
             <Detalhe regiao={regiao} aoAnalisar={aoAnalisar} aoImportar={aoMudarBase} />
             <Cartao titulo="Todas as regiões">
+              <Opcoes lista={[mundo]} escolhida={escolhida} aoEscolher={setEscolhida} />
               <p className="grupo-regioes">Continentes</p>
               <Opcoes lista={lista.filter((r) => r.tipo === 'continente')} escolhida={escolhida} aoEscolher={setEscolhida} />
               <p className="grupo-regioes">Oceanos</p>
@@ -76,7 +105,7 @@ function Detalhe({ regiao, aoAnalisar, aoImportar }) {
   if (!regiao) {
     return (
       <Cartao titulo="Nenhuma região escolhida">
-        <p className="texto-explicacao">Escolha um continente ou oceano para ver quantos terremotos há na base, analisá-lo ou importar dados.</p>
+        <p className="texto-explicacao">Escolha o mundo inteiro, um continente ou um oceano para ver quantos terremotos há na base, analisá-lo ou importar dados.</p>
       </Cartao>
     )
   }
@@ -104,7 +133,8 @@ function Detalhe({ regiao, aoAnalisar, aoImportar }) {
         <button className="botao primario" onClick={() => aoAnalisar(regiao)}>Analisar {regiao.nome}</button>
       )}
 
-      <details className="importacao-regiao" key={regiao.codigo} open>
+      {/* a importação do USGS é feita por região */}
+      {regiao.codigo !== MUNDO && <details className="importacao-regiao" key={regiao.codigo} open>
         <summary>{temDados ? 'Buscar mais dados no USGS' : 'Importar dados do USGS'}</summary>
       <p className="texto-explicacao">Baixa os terremotos da região (padrão M ≥ {formatarNumero(regiao.magnitude_completude)}; abaixo disso o catálogo é incompleto). Os já existentes são atualizados.</p>
       <div className="formulario-linha">
@@ -121,7 +151,7 @@ function Detalhe({ regiao, aoAnalisar, aoImportar }) {
           {ocupado ? 'Buscando…' : 'Buscar no USGS'}
         </button>
       </div>
-      </details>
+      </details>}
       {ocupado && <p className="texto-explicacao">Buscando no USGS… pode levar alguns minutos.</p>}
       {mensagem && <Aviso tipo={mensagem.tipo}>{mensagem.texto}</Aviso>}
     </Cartao>

@@ -31,6 +31,12 @@ export const FILTROS_VAZIOS = {
 }
 
 // A região escolhida (regiao) não conta: não é um filtro da barra lateral
+// Magnitude mínima nunca abaixo do corte de completude; se o filtro pedir mais, vale o filtro
+export function comCorte(filtros, corte) {
+  const minimo = filtros.magnitude_min === '' ? -Infinity : Number(filtros.magnitude_min)
+  return minimo >= corte ? filtros : { ...filtros, magnitude_min: corte }
+}
+
 export const quantosFiltros = ({ regiao, ...filtros }) => Object.values(filtros).filter((v) => v !== '').length
 
 export function Filtros({ filtros, aoAplicar }) {

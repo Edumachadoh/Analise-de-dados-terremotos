@@ -524,17 +524,6 @@ td.num {
   height: max(360px, calc(100vh - 340px));
 }
 
-.nota-mapa {
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  background: var(--alerta-fundo);
-  border: 1px solid var(--borda);
-  border-radius: 8px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--texto);
-}
-
 /* ------------------------------------------------------------ matriz de correlação */
 
 .matriz-correlacao {
@@ -759,19 +748,6 @@ td.num {
   gap: 6px;
 }
 
-/* Passo a passo e tabela do gráfico de persistência */
-.passos {
-  margin: 14px 0 0;
-  padding-left: 20px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--texto-2);
-}
-
-.passos strong {
-  color: var(--texto);
-}
-
 /* ------------------------------------------------------------ escolha da região */
 
 .regioes {
@@ -938,28 +914,6 @@ td.num {
   font-size: 12px;
   font-weight: 600;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-}
-
-/* gráficos do Painel que ficam recolhidos */
-.mais-graficos {
-  grid-column: 1 / -1;
-}
-
-.mais-graficos summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--texto-2);
-  padding: 8px 0;
-}
-
-.mais-graficos[open] summary {
-  margin-bottom: 8px;
-}
-
-/* tabela de casos positivos: a configuração atual do modelo em destaque */
-td.atual {
-  font-weight: 600;
-  color: var(--destaque);
 }
 
 /* painel da região: importação recolhida e mais compacto */
