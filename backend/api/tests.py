@@ -476,12 +476,19 @@ class MlTests(TestCase):
 
     def test_validacao_de_parametros(self):
         with self.assertRaises(ml.ErroModelo):
-            ml.validar_parametros("knn", {"n_neighbors": 0})
+            ml.validar_parametros("random_forest", {"n_estimators": 0})
         with self.assertRaises(ml.ErroModelo):
-            ml.validar_parametros("knn", {"vizinhos": 5})
+            ml.validar_parametros("random_forest", {"arvores": 5})
         with self.assertRaises(ml.ErroModelo):
-            ml.validar_parametros("rede_neural", {"camadas": "abc"})
-        self.assertEqual(ml.validar_parametros("arvore_decisao", {})["max_depth"], 5)
+            ml.validar_parametros("knn", {})  # desativado
+        self.assertEqual(ml.validar_parametros("gradient_boosting", {})["max_depth"], 3)
+
+    def test_magnitude_igual_ao_alvo_nao_conta(self):
+        df = ml._dataframe(Terremoto.objects.all())
+        painel, _ = ml.montar_painel(df.assign(magnitude=4.0), 4.0, 1.0)
+        self.assertEqual(painel["alvo"].sum(), 0)
+        painel, _ = ml.montar_painel(df.assign(magnitude=4.1), 4.0, 1.0)
+        self.assertGreater(painel["alvo"].sum(), 0)
 
     def test_painel_nao_usa_o_futuro(self):
         """A feature de um período só pode depender de períodos anteriores."""
@@ -500,43 +507,52 @@ class MlTests(TestCase):
         self.assertEqual(ModeloTreinado.objects.filter(ativo=True).count(), 1)
 
     def test_previsao_e_ativacao(self):
-        primeiro = self.cliente.post("/api/modelos/", {"algoritmo": "arvore_decisao"},
+        primeiro = self.cliente.post("/api/modelos/", {"algoritmo": "random_forest"},
                                      format="json").json()
-        self.cliente.post("/api/modelos/", {"algoritmo": "knn"}, format="json")
+        self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting"}, format="json")
         self.cliente.post(f"/api/modelos/{primeiro['id']}/ativar/")
 
         dados = self.cliente.get("/api/previsoes/?limite=3").json()
-        self.assertEqual(dados["algoritmo"], "arvore_decisao")
+        self.assertEqual(dados["algoritmo"], "random_forest")
         self.assertEqual(len(dados["celulas"]), 3)
         # o foco mais ativo deve estar entre as regiões mais prováveis
         centros = [(c["centro"]["latitude"], c["centro"]["longitude"]) for c in dados["celulas"]]
         self.assertIn((35.5, 140.5), centros)
 
     def test_previsao_por_ponto_e_fora_da_regiao(self):
-        self.cliente.post("/api/modelos/", {"algoritmo": "arvore_decisao"}, format="json")
+        self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting"}, format="json")
         ponto = self.cliente.get("/api/previsoes/?latitude=35.3&longitude=140.2").json()
         self.assertEqual(ponto["total_celulas"], 1)
         self.assertEqual(self.cliente.get("/api/previsoes/?latitude=95&longitude=-70").status_code, 400)
+
+    def test_previsao_por_regiao(self):
+        self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting"}, format="json")
+        Terremoto.objects.filter(latitude__gte=38, latitude__lt=39).update(zona="asia")
+
+        dados = self.cliente.get("/api/previsoes/?regiao=asia&limite=1").json()
+        self.assertEqual(dados["total_celulas"], 1)
+        self.assertEqual(dados["celulas"][0]["centro"], {"latitude": 38.5, "longitude": 142.5})
+        self.assertEqual(self.cliente.get("/api/previsoes/?regiao=nao-existe").status_code, 400)
 
     def test_sem_modelo_404(self):
         self.assertEqual(self.cliente.get("/api/previsoes/").status_code, 404)
 
     def test_magnitude_alvo_sem_casos_400(self):
-        resposta = self.cliente.post("/api/modelos/", {"algoritmo": "knn", "magnitude_alvo": 7.5},
+        resposta = self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting", "magnitude_alvo": 7.5},
                                      format="json")
         self.assertEqual(resposta.status_code, 400)
 
     @mock.patch("api.services.usgs.buscar_terremotos")
     def test_retreino_atualiza_dados_com_6_anos(self, buscar):
         buscar.return_value = [feature_usgs("novo", mag=5.5, lat=35.4, lon=140.3)]
-        resposta = self.cliente.post("/api/modelos/", {"algoritmo": "arvore_decisao",
+        resposta = self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting",
                                                        "atualizar_dados": True}, format="json")
         self.assertEqual(resposta.status_code, 201)
         buscar.assert_called_once_with(6, 2.5)
         self.assertTrue(Terremoto.objects.filter(usgs_id="novo").exists())
 
     def test_apagar_modelo_remove_arquivo(self):
-        modelo = self.cliente.post("/api/modelos/", {"algoritmo": "knn"}, format="json").json()
+        modelo = self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting"}, format="json").json()
         arquivo = ml.settings.PASTA_MODELOS / ModeloTreinado.objects.get(pk=modelo["id"]).arquivo
         self.assertTrue(arquivo.exists())
         self.assertEqual(self.cliente.delete(f"/api/modelos/{modelo['id']}/").status_code, 204)

@@ -112,7 +112,7 @@ ALVOS = [4.5, 5.0, 6.0]
 
 def poder_das_janelas(queryset, magnitude_alvo=4.5, tamanho_celula=1.0) -> list[dict]:
     """
-    AUC de cada feature de histórico sozinha, para prever terremoto >= alvo no período
+    AUC de cada feature de histórico sozinha, para prever terremoto > alvo no período
     seguinte (0,5 = chute, 1 = perfeito).
     """
     try:
@@ -127,7 +127,7 @@ def poder_das_janelas(queryset, magnitude_alvo=4.5, tamanho_celula=1.0) -> list[
 
 def casos_positivos(queryset) -> list[dict]:
     """
-    Linhas da tabela do ML (célula x período) e quantas têm terremoto >= alvo,
+    Linhas da tabela do ML (célula x período) e quantas têm terremoto > alvo,
     para cada tamanho de célula e magnitude-alvo.
     """
     try:
@@ -144,7 +144,7 @@ def casos_positivos(queryset) -> list[dict]:
         linhas = celulas * (n_periodos - 1)  # o período 0 não tem passado e sai da tabela
         com_passado = eventos[eventos["periodo"] > 0]
         for alvo in ALVOS:
-            positivos = len(com_passado.loc[com_passado["magnitude"] >= alvo,
+            positivos = len(com_passado.loc[com_passado["magnitude"] > alvo,
                                             ["cel_lat", "cel_lon", "periodo"]].drop_duplicates())
             resultado.append({"tamanho_celula": tamanho, "magnitude_alvo": alvo, "linhas": linhas,
                               "positivos": positivos, "taxa": round(positivos / linhas, 4)})

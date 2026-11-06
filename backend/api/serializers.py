@@ -112,7 +112,7 @@ class TreinoSerializer(serializers.Serializer):
     """
     algoritmo = serializers.ChoiceField(choices=list(ml.ALGORITMOS))
     parametros = serializers.DictField(required=False, default=dict)
-    magnitude_alvo = serializers.FloatField(default=4.5, min_value=2.5, max_value=8)
+    magnitude_alvo = serializers.FloatField(default=4.0, min_value=2.5, max_value=8)
     meses_teste = serializers.IntegerField(default=6, min_value=1, max_value=24)
     tamanho_celula = serializers.ChoiceField(choices=[0.5, 1.0, 2.0], default=1.0)
     anos = serializers.IntegerField(required=False, min_value=1, max_value=20,
@@ -136,6 +136,7 @@ class PrevisaoQuerySerializer(serializers.Serializer):
     latitude = serializers.FloatField(required=False, min_value=-90, max_value=90)
     longitude = serializers.FloatField(required=False, min_value=-180, max_value=180)
     limite = serializers.IntegerField(required=False, min_value=1, max_value=1000)
+    regiao = serializers.CharField(required=False, help_text="Código da região, ex.: america-do-sul")
 
     def validate(self, dados):
         if ("latitude" in dados) != ("longitude" in dados):
