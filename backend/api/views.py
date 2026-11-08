@@ -32,12 +32,22 @@ class TerremotoViewSet(viewsets.ModelViewSet):
     local, faixa_profundidade (raso, intermediario, profundo), tsunami, alerta,
     regiao (código do continente ou oceano, ex.: america-do-sul).
     Ordenação: ?ordering=-magnitude (campos: data_hora, magnitude, profundidade_km).
+    DELETE /api/terremotos/limpar/ apaga todos os terremotos da base.
     """
     queryset = Terremoto.objects.all()
     serializer_class = TerremotoSerializer
     filterset_class = TerremotoFilter
     ordering_fields = ["data_hora", "magnitude", "profundidade_km"]
     ordering = ["-data_hora"]
+
+    @action(detail=False, methods=["delete"])
+    def limpar(self, request):
+        """
+        Apaga todos os terremotos, de todas as regiões, sem considerar filtros. O histórico de
+        importações e os modelos treinados continuam no banco.
+        """
+        apagados, _ = Terremoto.objects.all().delete()
+        return Response({"apagados": apagados})
 
 
 class RegiaoViewSet(viewsets.ReadOnlyModelViewSet):

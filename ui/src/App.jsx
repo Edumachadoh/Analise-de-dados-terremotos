@@ -3,7 +3,6 @@ import { Icone } from './componentes/comuns.jsx'
 import { esquecerTerremotos } from './lib/useTodosTerremotos.js'
 import { Filtros, FILTROS_VAZIOS } from './componentes/Filtros.jsx'
 import Dados from './paginas/Dados.jsx'
-import Modelos from './paginas/Modelos.jsx'
 import Painel from './paginas/Painel.jsx'
 import Previsoes from './paginas/Previsoes.jsx'
 import Regioes, { MUNDO, REGIAO_MUNDO } from './paginas/Regioes.jsx'
@@ -13,8 +12,7 @@ const PAGINAS = [
   // as telas abaixo analisam a região escolhida (no início, o mundo inteiro)
   { id: 'painel', nome: 'Painel', icone: 'painel', filtros: true },
   { id: 'dados', nome: 'Dados', icone: 'dados', filtros: true },
-  // { id: 'modelos', nome: 'Modelos', icone: 'modelos' },
-  // { id: 'previsoes', nome: 'Previsões', icone: 'previsoes' },
+  { id: 'previsoes', nome: 'Previsões', icone: 'previsoes' },
 ]
 
 export default function App() {
@@ -75,8 +73,7 @@ export default function App() {
         {pagina === 'regioes' && <Regioes regiaoAtual={regiao} versaoBase={versaoBase} aoAnalisar={analisar} aoMudarBase={aoMudarBase} />}
         {pagina === 'painel' && <Painel filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} />}
         {pagina === 'dados' && <Dados filtros={filtrosDaApi} regiao={regiao} versaoBase={versaoBase} aoMudarBase={aoMudarBase} />}
-        {/* {pagina === 'modelos' && <Modelos aoMudarBase={aoMudarBase} />}
-        {pagina === 'previsoes' && <Previsoes versaoBase={versaoBase} />} */}
+        {pagina === 'previsoes' && <Previsoes regiao={regiao} codigoRegiao={filtrosDaApi.regiao} versaoBase={versaoBase} aoMudarBase={aoMudarBase} />}
       </main>
     </div>
   )

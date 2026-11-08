@@ -106,6 +106,15 @@ class TerremotoApiTests(TestCase):
     def test_filtro_invalido_400(self):
         self.assertEqual(self.cliente.get("/api/terremotos/?magnitude_min=abc").status_code, 400)
 
+    def test_limpar_apaga_todos_e_ignora_filtros(self):
+        coleta = Coleta.objects.create(anos=1)
+        resposta = self.cliente.delete("/api/terremotos/limpar/?magnitude_min=6")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.json(), {"apagados": 3})
+        self.assertFalse(Terremoto.objects.exists())
+        self.assertTrue(Coleta.objects.filter(pk=coleta.pk).exists())
+        self.assertEqual(self.cliente.get("/api/terremotos/limpar/").status_code, 405)
+
     def test_crud(self):
         dados = {"usgs_id": "manual", "latitude": 35.7, "longitude": 139.8,
                  "profundidade_km": 30, "magnitude": 4.2, "data_hora": "2026-10-01T12:00:00Z"}

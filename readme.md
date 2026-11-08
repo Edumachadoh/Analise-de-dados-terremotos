@@ -382,7 +382,7 @@ As três respondem com o registro da coleta:
 |---|---|---|
 | `algoritmo` | obrigatório | um dos algoritmos da tabela abaixo |
 | `parametros` | padrões do algoritmo | hiperparâmetros (veja `GET /api/modelos/algoritmos/`) |
-| `magnitude_alvo` | 4.5 | prever terremotos com magnitude ≥ este valor (2,5 a 8) |
+| `magnitude_alvo` | 4.0 | prever terremotos com magnitude maior que este valor (2,5 a 8) |
 | `meses_teste` | 6 | quantos períodos de 30 dias, os mais recentes, ficam para o teste |
 | `tamanho_celula` | 1.0 | lado da célula em graus: 0.5, 1.0 ou 2.0 |
 | `anos` | toda a base | usar só os últimos N anos da base |
@@ -390,22 +390,21 @@ As três respondem com o registro da coleta:
 
 | `algoritmo` | Nome | Parâmetros configuráveis |
 |---|---|---|
-| `regressao_logistica` | Regressão logística | `C` |
-| `arvore_decisao` | Árvore de decisão | `max_depth`, `min_samples_leaf` |
-| `knn` | K vizinhos mais próximos | `n_neighbors`, `weights` |
 | `random_forest` | Random Forest | `n_estimators`, `max_depth`, `min_samples_leaf` |
 | `gradient_boosting` | Gradient Boosting | `n_estimators`, `learning_rate`, `max_depth` |
-| `rede_neural` | Rede neural (MLP) | `camadas`, `alpha`, `max_iter` |
+
+Regressão logística, árvore de decisão, KNN e rede neural estão desativados: seguem comentados em `backend/api/services/ml.py`.
 
 A resposta traz as métricas de teste (ROC AUC, precisão média, F1, comparação com o baseline histórico) e a importância das features. Status: 201 quando treinado, 400 quando os parâmetros são inválidos ou a base não tem dados suficientes, 502 quando `atualizar_dados` falha no USGS.
 
 ### Previsões
 
-**`GET /api/previsoes/`**: probabilidade de cada célula ter um terremoto com magnitude ≥ a magnitude-alvo do modelo nos 30 dias seguintes ao terremoto mais recente da base.
+**`GET /api/previsoes/`**: probabilidade de cada célula ter um terremoto com magnitude maior que a magnitude-alvo do modelo nos 30 dias seguintes ao terremoto mais recente da base.
 
 | Parâmetro | Descrição |
 |---|---|
 | `limite` | devolve só as N células mais prováveis |
+| `regiao` | só as células com algum terremoto dessa região (ex.: `america-do-sul`); o modelo continua aprendendo com o mundo todo |
 | `latitude`, `longitude` | devolve só a célula que contém o ponto (informe os dois) |
 | `modelo` | id do modelo; padrão: o modelo ativo |
 

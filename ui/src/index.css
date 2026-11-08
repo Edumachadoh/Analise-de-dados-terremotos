@@ -302,9 +302,60 @@ input[type='text'] {
   font-size: 13px;
 }
 
+.botao.perigo {
+  background: var(--erro);
+  border-color: var(--erro);
+  color: #fff;
+  font-weight: 600;
+}
+
+.botao.perigo:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--erro);
+}
+
 .botao:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* janela de confirmação (Confirmacao, em comuns.jsx) */
+.sobreposicao {
+  position: fixed;
+  inset: 0;
+  z-index: 2000; /* acima dos mapas do Leaflet */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.janela {
+  width: min(440px, 100%);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.janela h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.janela-texto {
+  font-size: 14px;
+  color: var(--texto-2);
+  line-height: 1.5;
+}
+
+.janela-botoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
 }
 
 .aviso {
@@ -558,11 +609,40 @@ td.num {
 
 /* ------------------------------------------------------------ modelos */
 
+.abas {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.abas button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  padding: 8px 12px;
+  margin-bottom: -1px;
+  cursor: pointer;
+  color: var(--texto-2);
+  font: inherit;
+}
+
+.abas button:hover {
+  color: var(--texto);
+}
+
+.abas button.ativo {
+  border-bottom-color: var(--destaque);
+  color: var(--texto);
+  font-weight: 600;
+}
+
 .modelos {
   display: grid;
   grid-template-columns: minmax(280px, 340px) 1fr;
   gap: 16px;
   align-items: start;
+  margin-bottom: 16px;
 }
 
 .coluna {
@@ -615,8 +695,13 @@ td.num {
 
 .formulario .linha {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+/* as legendas têm tamanhos diferentes: o campo fica no fim para alinhar entre as colunas */
+.formulario .linha .campo input {
+  margin-top: auto;
 }
 
 .check {

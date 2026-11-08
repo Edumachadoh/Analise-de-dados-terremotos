@@ -10,3 +10,6 @@ __pycache__/
 # SQL
 *.sqlite3
 *.sqlite
+
+# Modelos de ML treinados (gerados pelo sistema, podem passar de 100 MB)
+backend/media/

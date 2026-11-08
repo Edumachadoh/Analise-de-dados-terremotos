@@ -6,6 +6,7 @@ navegável em /api/, que lista os endpoints.
     /api/regioes/mapa/                  polígonos das regiões, para desenhar o mapa
     /api/regioes/{codigo}/importar/     busca no USGS os terremotos da região
     /api/terremotos/                    CRUD + filtros (?regiao=america-do-sul)
+    /api/terremotos/limpar/             DELETE apaga todos os terremotos da base
     /api/estatisticas/                  resumo (e /por-mes/, /por-magnitude/, /por-profundidade/)
     /api/coletas/                       histórico e nova importação do USGS
     /api/coletas/upload/                importação de um CSV enviado (multipart)
