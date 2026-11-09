@@ -60,6 +60,7 @@ OCEANOS = {
 EUROPA_RUSSA = box(-100, -90, 60, 90)
 
 
+# Agrupa as geometrias dos países por continente, com as correções necessárias
 def _partes_por_continente(paises):
     """{continente: [geometrias]}, com as correções da Rússia e da Guiana Francesa."""
     partes = {continente: [] for continente in CONTINENTES}
@@ -82,6 +83,7 @@ def _partes_por_continente(paises):
     return partes
 
 
+# Lê as features de um arquivo GeoJSON da pasta de dados
 def _ler(nome):
     caminho = PASTA / nome
     if not caminho.exists():
@@ -89,12 +91,14 @@ def _ler(nome):
     return json.loads(caminho.read_text(encoding="utf-8"))["features"]
 
 
+# Simplifica a geometria e a converte em GeoJSON
 def _geojson(geometria, tolerancia):
     """Simplifica e arredonda (poucos milhares de pontos por região) e devolve um GeoJSON."""
     geometria = shapely.set_precision(geometria.simplify(tolerancia, preserve_topology=True), 0.001)
     return mapping(geometria)
 
 
+# Calcula uma caixa de coordenadas por parte da região, ignorando ilhotas
 def _caixas(geometria):
     """Uma caixa [lat_min, lat_max, lon_min, lon_max] por parte da região, sem as ilhotas."""
     partes = list(geometria.geoms) if hasattr(geometria, "geoms") else [geometria]
@@ -111,6 +115,7 @@ def _caixas(geometria):
 class Command(BaseCommand):
     help = "Carrega os continentes e oceanos e reclassifica os terremotos por região."
 
+    # Carrega continentes e oceanos no banco e reclassifica os terremotos
     def handle(self, *args, **opcoes):
         paises = _ler("ne_110m_admin_0_countries.geojson")
         mares = _ler("ne_110m_geography_marine_polys.geojson")

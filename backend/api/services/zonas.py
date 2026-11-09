@@ -20,6 +20,7 @@ from ..models import Regiao, Terremoto
 LOTE_ATUALIZACAO = 20_000  # ids por UPDATE (o SQLite aceita até 32.766 variáveis por consulta)
 
 
+# Converte o GeoJSON em geometria preparada para testes rápidos de ponto
 def _preparar(geojson):
     geometria = shape(geojson)
     shapely.prepare(geometria)
@@ -29,6 +30,7 @@ def _preparar(geojson):
 class Classificador:
     """Os polígonos das regiões, prontos para testar muitos pontos de uma vez."""
 
+    # Prepara os polígonos dos continentes, das costas e dos oceanos
     def __init__(self, regioes=None):
         regioes = list(Regiao.objects.order_by("ordem") if regioes is None else regioes)
         self.continentes = [(r.codigo, _preparar(r.geometria), _preparar(r.costa or r.geometria))
@@ -36,6 +38,7 @@ class Classificador:
         self.oceanos = [(r.codigo, _preparar(r.geometria))
                         for r in regioes if r.tipo == Regiao.Tipo.OCEANO and r.geometria]
 
+    # Descobre a região (continente ou oceano) de cada ponto
     def classificar(self, latitudes, longitudes) -> np.ndarray:
         """Código da região de cada ponto ("" se não houver nenhuma que sirva)."""
         x = np.asarray(longitudes, dtype=float)
@@ -76,10 +79,12 @@ class Classificador:
                 zonas[indices] = [self.oceanos[i][0] for i in distancias.argmin(axis=0)]
         return zonas
 
+    # Descobre a região de um único ponto
     def zona_do_ponto(self, latitude: float, longitude: float) -> str:
         return str(self.classificar([latitude], [longitude])[0])
 
 
+# Preenche a região (zona) dos terremotos ainda não salvos
 def atribuir(terremotos: list[Terremoto]) -> None:
     """Preenche Terremoto.zona dos eventos (ainda não salvos) pelas coordenadas."""
     if not terremotos:
@@ -90,6 +95,7 @@ def atribuir(terremotos: list[Terremoto]) -> None:
         terremoto.zona = zona
 
 
+# Recalcula a região de todos os terremotos do banco
 def reclassificar() -> dict[str, int]:
     """
     Recalcula a região de todos os terremotos do banco e devolve quantos há em cada uma.

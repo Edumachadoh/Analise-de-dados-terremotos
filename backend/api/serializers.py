@@ -52,11 +52,13 @@ class ColetaSerializer(serializers.ModelSerializer):
                             "recebidos", "novos", "atualizados", "mensagem"]
         extra_kwargs = {"anos": {"required": False}}
 
+    # Valida que a magnitude mínima está entre -2 e 10
     def validate_magnitude_minima(self, valor):
         if valor is not None and not -2 <= valor <= 10:
             raise serializers.ValidationError("Deve estar entre -2 e 10.")
         return valor
 
+    # Completa os anos com o padrão quando não informados
     def validate(self, dados):
         dados.setdefault("anos", settings.ANOS_COLETA_PADRAO)
         return dados
@@ -73,6 +75,7 @@ class UploadCsvSerializer(serializers.Serializer):
         help_text=f"Padrão: {settings.MAGNITUDE_MINIMA_COLETA}, a mesma da coleta do USGS",
     )
 
+    # Valida a extensão e o tamanho do arquivo enviado
     def validate_arquivo(self, arquivo):
         extensao = Path(arquivo.name).suffix.lower()
         if extensao not in settings.UPLOAD_EXTENSOES:
@@ -84,6 +87,7 @@ class UploadCsvSerializer(serializers.Serializer):
                 f"Arquivo maior que {settings.UPLOAD_TAMANHO_MAXIMO_MB} MB.")
         return arquivo
 
+    # Usa a magnitude mínima padrão quando não informada
     def validate(self, dados):
         if dados.get("magnitude_minima") is None:
             dados["magnitude_minima"] = settings.MAGNITUDE_MINIMA_COLETA
@@ -100,6 +104,7 @@ class ModeloTreinadoSerializer(serializers.ModelSerializer):
                   "total_terremotos", "metricas", "ativo", "treinado_em"]
         read_only_fields = fields
 
+    # Devolve o nome legível do algoritmo do modelo
     def get_algoritmo_nome(self, obj):
         return ml.ALGORITMOS.get(obj.algoritmo, {}).get("nome", obj.algoritmo)
 
@@ -119,6 +124,7 @@ class TreinoSerializer(serializers.Serializer):
                                     help_text="Janela de dados usada (padrão: toda a base)")
     atualizar_dados = serializers.BooleanField(default=False)
 
+    # Valida os parâmetros do algoritmo e define os anos do re-treino
     def validate(self, dados):
         # Reaproveita a validação do serviço de ML e devolve os parâmetros completos
         try:
@@ -138,6 +144,7 @@ class PrevisaoQuerySerializer(serializers.Serializer):
     limite = serializers.IntegerField(required=False, min_value=1, max_value=1000)
     regiao = serializers.CharField(required=False, help_text="Código da região, ex.: america-do-sul")
 
+    # Exige que latitude e longitude sejam informadas juntas
     def validate(self, dados):
         if ("latitude" in dados) != ("longitude" in dados):
             raise serializers.ValidationError("Informe latitude e longitude juntas.")

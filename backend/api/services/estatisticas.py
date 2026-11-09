@@ -22,10 +22,12 @@ FAIXAS_MAGNITUDE = [
 ]
 
 
+# Arredonda o valor, devolvendo None quando não há valor
 def _arredondar(valor, casas=2):
     return round(valor, casas) if valor is not None else None
 
 
+# Resume os terremotos: total, magnitudes, período coberto e o evento mais forte
 def resumo(queryset) -> dict:
     agregado = queryset.aggregate(
         total=Count("id"),
@@ -51,6 +53,7 @@ def resumo(queryset) -> dict:
     }
 
 
+# Conta os terremotos e calcula as magnitudes média e máxima de cada mês
 def por_mes(queryset) -> list[dict]:
     linhas = (queryset.annotate(mes=TruncMonth("data_hora")).values("mes")
               .annotate(total=Count("id"), magnitude_media=Avg("magnitude"),
@@ -61,6 +64,7 @@ def por_mes(queryset) -> list[dict]:
              "magnitude_maxima": l["magnitude_maxima"]} for l in linhas]
 
 
+# Conta os terremotos em cada faixa de magnitude
 def por_faixa_magnitude(queryset) -> list[dict]:
     contagens = queryset.aggregate(**{
         f"f{i}": Count("id", filter=condicao) for i, (_, condicao) in enumerate(FAIXAS_MAGNITUDE)
@@ -69,6 +73,7 @@ def por_faixa_magnitude(queryset) -> list[dict]:
             for i, (nome, _) in enumerate(FAIXAS_MAGNITUDE)]
 
 
+# Conta os terremotos e a magnitude média em cada faixa de profundidade
 def por_faixa_profundidade(queryset) -> list[dict]:
     raso, intermediario = Terremoto.LIMITE_RASO, Terremoto.LIMITE_INTERMEDIARIO
     faixa = Case(
@@ -90,6 +95,7 @@ def por_faixa_profundidade(queryset) -> list[dict]:
 CAMPOS_CORRELACAO = ["magnitude", "profundidade_km", "estacoes", "lacuna_azimutal", "rms"]
 
 
+# Calcula a matriz de correlação de Pearson entre as colunas numéricas
 def correlacao(queryset) -> dict:
     """
     Correlação de Pearson entre as colunas numéricas (matriz n x n, None onde não dá para calcular).
@@ -110,6 +116,7 @@ TAMANHOS_CELULA = [0.5, 1.0, 2.0]
 ALVOS = [4.5, 5.0, 6.0]
 
 
+# Mede (pela AUC) quanto cada feature de histórico do ML prevê sozinha
 def poder_das_janelas(queryset, magnitude_alvo=4.5, tamanho_celula=1.0) -> list[dict]:
     """
     AUC de cada feature de histórico sozinha, para prever terremoto > alvo no período
@@ -125,6 +132,7 @@ def poder_das_janelas(queryset, magnitude_alvo=4.5, tamanho_celula=1.0) -> list[
             for f in JANELAS]
 
 
+# Conta as linhas da tabela do ML e quantas têm terremoto acima de cada alvo
 def casos_positivos(queryset) -> list[dict]:
     """
     Linhas da tabela do ML (célula x período) e quantas têm terremoto > alvo,

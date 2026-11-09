@@ -25,6 +25,7 @@ from .services.usgs import ErroUSGS
 AGORA = datetime(2026, 10, 1, tzinfo=timezone.utc)
 
 
+# Converte caixas de coordenadas em um MultiPolygon GeoJSON
 def _retangulos(caixas):
     return {"type": "MultiPolygon", "coordinates": [
         [[[lon_min, lat_min], [lon_max, lat_min], [lon_max, lat_max],
@@ -32,6 +33,7 @@ def _retangulos(caixas):
         for lat_min, lat_max, lon_min, lon_max in caixas]}
 
 
+# Cria uma região de teste a partir de caixas de coordenadas
 def criar_regiao(codigo="japan", nome="Japan", caixas=((24, 46, 122, 146),),
                  tipo=Regiao.Tipo.CONTINENTE, margem=0, **campos) -> Regiao:
     """
@@ -47,6 +49,7 @@ def criar_regiao(codigo="japan", nome="Japan", caixas=((24, 46, 122, 146),),
                                  costa=costa, caixas=[list(c) for c in caixas], **campos)
 
 
+# Cria um terremoto de teste, com valores padrão para os campos não informados
 def criar_terremoto(**campos) -> Terremoto:
     padrao = dict(usgs_id=f"t{Terremoto.objects.count()}", latitude=35.7, longitude=139.7,
                   profundidade_km=30, magnitude=4.0, data_hora=AGORA, local="Teste, Japão")
@@ -57,6 +60,7 @@ def criar_terremoto(**campos) -> Terremoto:
     return terremoto
 
 
+# Monta uma feature no formato GeoJSON devolvido pelo USGS
 def feature_usgs(id_, mag=4.6, lat=38.3, lon=142.4, prof=40.0, dias_atras=10):
     """Uma feature no formato GeoJSON devolvido pelo USGS."""
     ms = int((AGORA - timedelta(days=dias_atras)).timestamp() * 1000)
@@ -65,6 +69,7 @@ def feature_usgs(id_, mag=4.6, lat=38.3, lon=142.4, prof=40.0, dias_atras=10):
                            "tsunami": 0, "magType": "mb", "felt": None, "alert": None}}
 
 
+# Cria uma base com atividade concentrada em três células para testar o ML
 def criar_base_sintetica(meses=24, semente=0):
     """
     Base com atividade concentrada em três células, para o ML ter padrão a aprender.
@@ -84,17 +89,20 @@ def criar_base_sintetica(meses=24, semente=0):
 
 
 class TerremotoApiTests(TestCase):
+    # Prepara o cliente da API e três terremotos de teste
     def setUp(self):
         self.cliente = APIClient()
         criar_terremoto(magnitude=6.5, profundidade_km=20)
         criar_terremoto(magnitude=4.1, profundidade_km=150, data_hora=AGORA - timedelta(days=400))
         criar_terremoto(magnitude=5.0, profundidade_km=350)
 
+    # Testa se a listagem de terremotos é paginada com o total correto
     def test_lista_paginada(self):
         resposta = self.cliente.get("/api/terremotos/")
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta.json()["count"], 3)
 
+    # Testa os filtros de magnitude, faixa de profundidade e data
     def test_filtros(self):
         r = self.cliente.get("/api/terremotos/?magnitude_min=5")
         self.assertEqual(r.json()["count"], 2)
@@ -103,9 +111,11 @@ class TerremotoApiTests(TestCase):
         r = self.cliente.get("/api/terremotos/?data_inicio=2026-01-01")
         self.assertEqual(r.json()["count"], 2)
 
+    # Testa se um filtro com valor inválido devolve erro 400
     def test_filtro_invalido_400(self):
         self.assertEqual(self.cliente.get("/api/terremotos/?magnitude_min=abc").status_code, 400)
 
+    # Testa se limpar a base apaga todos os terremotos e mantém as coletas
     def test_limpar_apaga_todos_e_ignora_filtros(self):
         coleta = Coleta.objects.create(anos=1)
         resposta = self.cliente.delete("/api/terremotos/limpar/?magnitude_min=6")
@@ -115,6 +125,7 @@ class TerremotoApiTests(TestCase):
         self.assertTrue(Coleta.objects.filter(pk=coleta.pk).exists())
         self.assertEqual(self.cliente.get("/api/terremotos/limpar/").status_code, 405)
 
+    # Testa criar, ler, atualizar e apagar um terremoto pela API
     def test_crud(self):
         dados = {"usgs_id": "manual", "latitude": 35.7, "longitude": 139.8,
                  "profundidade_km": 30, "magnitude": 4.2, "data_hora": "2026-10-01T12:00:00Z"}
@@ -126,6 +137,7 @@ class TerremotoApiTests(TestCase):
         self.assertEqual(self.cliente.delete(url).status_code, 204)
         self.assertEqual(self.cliente.get(url).status_code, 404)
 
+    # Testa se coordenadas fora da faixa válida são recusadas
     def test_validacao_de_faixas(self):
         dados = {"usgs_id": "x", "latitude": -120, "longitude": 139.8,
                  "profundidade_km": 30, "magnitude": 14, "data_hora": "2026-10-01T12:00:00Z"}
@@ -134,6 +146,7 @@ class TerremotoApiTests(TestCase):
         self.assertIn("latitude", resposta.json())
         self.assertIn("magnitude", resposta.json())
 
+    # Testa se não é possível cadastrar dois terremotos com o mesmo usgs_id
     def test_usgs_id_unico(self):
         dados = {"usgs_id": "t0", "latitude": 35, "longitude": 140, "profundidade_km": 10,
                  "magnitude": 4, "data_hora": "2026-10-01T12:00:00Z"}
@@ -141,6 +154,7 @@ class TerremotoApiTests(TestCase):
 
 
 class RegiaoTests(TestCase):
+    # Prepara regiões e terremotos de teste
     def setUp(self):
         self.cliente = APIClient()
         criar_regiao()
@@ -149,17 +163,21 @@ class RegiaoTests(TestCase):
         criar_terremoto(latitude=36.0, longitude=140.0)          # Japão
         criar_terremoto(latitude=-33.4, longitude=-70.6)         # América do Sul
 
+    # Testa se o filtro por região devolve só os terremotos dela
     def test_filtro_por_regiao(self):
         japao = self.cliente.get("/api/terremotos/?regiao=japan").json()
         sul = self.cliente.get("/api/terremotos/?regiao=america-do-sul").json()
         self.assertEqual((japao["count"], sul["count"]), (2, 1))
 
+    # Testa se filtrar por uma região inexistente devolve erro 400
     def test_regiao_inexistente_400(self):
         self.assertEqual(self.cliente.get("/api/terremotos/?regiao=atlantida").status_code, 400)
 
+    # Testa se as estatísticas consideram só a região filtrada
     def test_estatisticas_respeitam_a_regiao(self):
         self.assertEqual(self.cliente.get("/api/estatisticas/?regiao=america-do-sul").json()["total"], 1)
 
+    # Testa se a lista de regiões traz a contagem de terremotos de cada uma
     def test_lista_com_contagem_de_terremotos(self):
         regioes = {r["codigo"]: r for r in self.cliente.get("/api/regioes/").json()}
         self.assertEqual(regioes["japan"]["total_terremotos"], 2)
@@ -168,11 +186,13 @@ class RegiaoTests(TestCase):
         com_dados = self.cliente.get("/api/regioes/?com_dados=true").json()
         self.assertEqual({r["codigo"] for r in com_dados}, {"japan", "america-do-sul"})
 
+    # Testa o detalhe de uma região, com o total de terremotos
     def test_detalhe_da_regiao(self):
         dados = self.cliente.get("/api/regioes/japan/").json()
         self.assertEqual((dados["nome"], dados["total_terremotos"]), ("Japan", 2))
         self.assertEqual(self.cliente.get("/api/regioes/atlantida/").status_code, 404)
 
+    # Testa se importar uma região sem recorte devolve erro 400
     def test_importar_regiao_sem_recorte_400(self):
         criar_regiao("vazia", "Sem recorte", [], tipo=Regiao.Tipo.OCEANO)
         resposta = self.cliente.post("/api/regioes/vazia/importar/", {}, format="json")
@@ -182,27 +202,33 @@ class RegiaoTests(TestCase):
 class ClassificacaoTests(TestCase):
     """Terra, costa e mar aberto: a regra que decide a região de cada terremoto."""
 
+    # Prepara ilhas e um oceano de teste para a classificação
     def setUp(self):
         criar_regiao("ilha", "Ilha", [(30, 40, 130, 140)], margem=2)
         criar_regiao("ilha-vizinha", "Ilha vizinha", [(30, 40, 143, 150)], margem=2)
         criar_regiao("mar", "Mar", [(0, 60, 100, 170)], tipo=Regiao.Tipo.OCEANO)
         self.classificador = zonas.Classificador()
 
+    # Testa se um ponto em terra vai para o continente
     def test_em_terra(self):
         self.assertEqual(self.classificador.zona_do_ponto(35, 135), "ilha")
         self.assertEqual(self.classificador.zona_do_ponto(35, 145), "ilha-vizinha")
 
+    # Testa se um ponto no mar perto da costa vai para o continente mais próximo
     def test_no_mar_perto_da_costa_vai_para_o_continente_mais_proximo(self):
         # 141,2° e 141,9° estão na costa das duas ilhas; ganha a mais próxima
         self.assertEqual(self.classificador.zona_do_ponto(35, 141.2), "ilha")
         self.assertEqual(self.classificador.zona_do_ponto(35, 141.9), "ilha-vizinha")
 
+    # Testa se um ponto em mar aberto vai para o oceano
     def test_no_mar_aberto_vai_para_o_oceano(self):
         self.assertEqual(self.classificador.zona_do_ponto(10, 120), "mar")
 
+    # Testa se um ponto fora de todos os polígonos vai para o oceano mais próximo
     def test_fora_de_todos_os_poligonos_vai_para_o_oceano_mais_proximo(self):
         self.assertEqual(self.classificador.zona_do_ponto(-50, 0), "mar")
 
+    # Testa se reclassificar o banco dá o mesmo resultado que atribuir na importação
     def test_reclassificar_concorda_com_atribuir(self):
         pontos = [(35, 135), (35, 145), (35, 141.2), (35, 141.9), (10, 120), (-50, 0)]
         lista = [Terremoto(usgs_id=f"p{i}", latitude=lat, longitude=lon, profundidade_km=10,
@@ -216,6 +242,7 @@ class ClassificacaoTests(TestCase):
         self.assertEqual(dict(Terremoto.objects.values_list("usgs_id", "zona")), esperado)
         self.assertEqual(sum(contagem.values()), len(pontos))
 
+    # Testa se a importação grava a região de cada terremoto
     @mock.patch("api.services.usgs.buscar_terremotos")
     def test_importacao_grava_a_regiao_do_evento(self, buscar):
         # consultado pelo oceano, mas o evento está na ilha
@@ -225,20 +252,24 @@ class ClassificacaoTests(TestCase):
 
 
 class EstatisticaTests(TestCase):
+    # Prepara o cliente da API e terremotos de teste para as estatísticas
     def setUp(self):
         self.cliente = APIClient()
         criar_terremoto(magnitude=6.5, profundidade_km=20)
         criar_terremoto(magnitude=4.1, profundidade_km=150)
         criar_terremoto(magnitude=2.8, profundidade_km=10, data_hora=AGORA - timedelta(days=40))
 
+    # Testa o resumo geral das estatísticas
     def test_resumo(self):
         dados = self.cliente.get("/api/estatisticas/").json()
         self.assertEqual(dados["total"], 3)
         self.assertEqual(dados["mais_forte"]["magnitude"], 6.5)
 
+    # Testa se o resumo considera os filtros aplicados
     def test_resumo_respeita_filtros(self):
         self.assertEqual(self.cliente.get("/api/estatisticas/?magnitude_min=4").json()["total"], 2)
 
+    # Testa as contagens por faixa de magnitude e de profundidade
     def test_por_faixas(self):
         magnitude = {f["faixa"]: f["total"] for f in
                      self.cliente.get("/api/estatisticas/por-magnitude/").json()}
@@ -248,10 +279,12 @@ class EstatisticaTests(TestCase):
                         self.cliente.get("/api/estatisticas/por-profundidade/").json()}
         self.assertEqual(profundidade, {"raso": 2, "intermediario": 1, "profundo": 0})
 
+    # Testa o agrupamento dos terremotos por mês
     def test_por_mes(self):
         meses = self.cliente.get("/api/estatisticas/por-mes/").json()
         self.assertEqual([m["mes"] for m in meses], ["2026-08", "2026-10"])
 
+    # Testa a matriz de correlação entre as colunas numéricas
     def test_correlacao(self):
         dados = self.cliente.get("/api/estatisticas/correlacao/").json()
         self.assertEqual(dados["colunas"], estatisticas.CAMPOS_CORRELACAO)
@@ -259,27 +292,32 @@ class EstatisticaTests(TestCase):
         self.assertAlmostEqual(dados["valores"][0][1], dados["valores"][1][0])
         self.assertIsNone(dados["valores"][0][2])  # nenhum evento de teste tem estações
 
+    # Testa se as análises do ML devolvem lista vazia sem dados suficientes
     def test_analises_do_ml_sem_dados_suficientes(self):
         self.assertEqual(self.cliente.get("/api/estatisticas/janelas/").json(), [])
         self.assertEqual(self.cliente.get("/api/estatisticas/casos-positivos/").json(), [])
 
 
 class AnalisesDoMlTests(TestCase):
+    # Prepara o cliente da API e a base sintética para as análises do ML
     def setUp(self):
         self.cliente = APIClient()
         criar_base_sintetica()
 
+    # Testa se a AUC de cada janela de histórico fica entre 0 e 1
     def test_janelas(self):
         janelas = {j["feature"]: j["auc"] for j in self.cliente.get("/api/estatisticas/janelas/").json()}
         self.assertEqual(list(janelas), estatisticas.JANELAS)
         self.assertTrue(all(0 <= auc <= 1 for auc in janelas.values()))
 
+    # Testa se as faixas das janelas cobrem todas as linhas da tabela do ML
     def test_janelas_por_faixa_cobrem_a_tabela_do_ml(self):
         painel, _ = ml.montar_painel(ml._dataframe(Terremoto.objects.all()), 4.5, 1.0)
         for janela in self.cliente.get("/api/estatisticas/janelas/").json():
             self.assertEqual(sum(f["linhas"] for f in janela["faixas"]), len(painel))
             self.assertEqual(sum(f["positivos"] for f in janela["faixas"]), int(painel["alvo"].sum()))
 
+    # Testa se a contagem de casos positivos bate com a tabela do ML
     def test_casos_positivos_bate_com_a_tabela_do_ml(self):
         linhas = self.cliente.get("/api/estatisticas/casos-positivos/").json()
         self.assertEqual(len(linhas), len(estatisticas.TAMANHOS_CELULA) * len(estatisticas.ALVOS))
@@ -290,6 +328,7 @@ class AnalisesDoMlTests(TestCase):
 
 
 class ImportacaoTests(TestCase):
+    # Testa se importar de novo atualiza os terremotos sem duplicar
     @mock.patch("api.services.usgs.buscar_terremotos")
     def test_importa_e_atualiza_sem_duplicar(self, buscar):
         buscar.return_value = [feature_usgs("a"), feature_usgs("b")]
@@ -302,6 +341,7 @@ class ImportacaoTests(TestCase):
         self.assertEqual(Terremoto.objects.count(), 3)
         self.assertEqual(Terremoto.objects.get(usgs_id="a").magnitude, 5.1)
 
+    # Testa a conversão das coordenadas e do tempo vindos do USGS
     def test_converte_coordenadas_e_tempo(self):
         registro = importacao.registro_de_feature(feature_usgs("a", lat=38, lon=142, prof=12))
         terremoto = importacao.terremoto_de_registro(registro)
@@ -309,6 +349,7 @@ class ImportacaoTests(TestCase):
         self.assertEqual(terremoto.profundidade_km, 12)
         self.assertEqual(terremoto.data_hora, AGORA - timedelta(days=10))
 
+    # Testa a importação do USGS pela rota POST /api/coletas/
     @mock.patch("api.services.usgs.buscar_terremotos")
     def test_post_coleta(self, buscar):
         buscar.return_value = [feature_usgs("a")]
@@ -317,6 +358,7 @@ class ImportacaoTests(TestCase):
         self.assertEqual(resposta.json()["novos"], 1)
         buscar.assert_called_once_with(2, 2.5)
 
+    # Testa se a falha do USGS devolve 502 e registra a coleta com erro
     @mock.patch("api.services.usgs.buscar_terremotos", side_effect=ErroUSGS("fora do ar"))
     def test_post_coleta_com_usgs_fora_do_ar(self, _):
         resposta = APIClient().post("/api/coletas/", {"anos": 2}, format="json")
@@ -325,6 +367,7 @@ class ImportacaoTests(TestCase):
         self.assertEqual(Coleta.objects.get().status, Coleta.Status.ERRO)
 
 
+# Monta um arquivo CSV em memória com as colunas do USGS
 def csv_usgs(*linhas, cabecalho=None):
     """Arquivo CSV em memória com as colunas do USGS (as mesmas de data/raw/)."""
     cabecalho = cabecalho or ("id,mag,magType,time,updated,place,tsunami,alert,sig,felt,cdi,mmi,"
@@ -339,13 +382,16 @@ LINHA_CSV = ('{id},{mag},mb,{{ms}},{{ms}},"10 km E of Sendai, Japan",0,,300,,,,3
 
 
 class UploadCsvTests(TestCase):
+    # Prepara o cliente da API para os testes de upload de CSV
     def setUp(self):
         self.cliente = APIClient()
 
+    # Envia um arquivo para a rota de upload
     def enviar(self, arquivo, **campos):
         return self.cliente.post("/api/coletas/upload/", {"arquivo": arquivo, **campos},
                                  format="multipart")
 
+    # Testa a importação de um CSV com as colunas do USGS
     def test_importa_csv_com_colunas_do_usgs(self):
         resposta = self.enviar(csv_usgs(LINHA_CSV.format(id="a", mag=4.6, tipo="earthquake"),
                                         LINHA_CSV.format(id="b", mag=3.0, tipo="earthquake")))
@@ -356,6 +402,7 @@ class UploadCsvTests(TestCase):
                          (38.2, 142.0, 4.6))
         self.assertEqual(terremoto.data_hora, AGORA)
 
+    # Testa se o upload aceita o tempo em data ISO
     def test_aceita_time_em_data_iso(self):
         """O mesmo evento com time no formato do banco (data ISO em UTC)."""
         linha = LINHA_CSV.replace("{{ms}},{{ms}}", "2026-10-01 00:00:00.000000,2026-10-01 00:00:00")
@@ -365,12 +412,14 @@ class UploadCsvTests(TestCase):
         self.assertEqual(importacao.ms_em_texto(int(AGORA.timestamp() * 1000)),
                          "2026-10-01 00:00:00.000000")
 
+    # Testa se reenviar o mesmo CSV atualiza sem duplicar
     def test_reenvio_atualiza_sem_duplicar(self):
         self.enviar(csv_usgs(LINHA_CSV.format(id="a", mag=4.6, tipo="earthquake")))
         resposta = self.enviar(csv_usgs(LINHA_CSV.format(id="a", mag=5.0, tipo="earthquake")))
         self.assertEqual((resposta.json()["novos"], resposta.json()["atualizados"]), (0, 1))
         self.assertEqual(Terremoto.objects.get().magnitude, 5.0)
 
+    # Testa se o upload descarta magnitude baixa e eventos que não são terremotos
     def test_descarta_magnitude_baixa_e_outros_tipos(self):
         resposta = self.enviar(csv_usgs(LINHA_CSV.format(id="a", mag=4.6, tipo="earthquake"),
                                         LINHA_CSV.format(id="b", mag=1.2, tipo="earthquake"),
@@ -378,17 +427,20 @@ class UploadCsvTests(TestCase):
         self.assertEqual(resposta.json()["novos"], 1)
         self.assertIn("2 linha(s) descartada(s)", resposta.json()["mensagem"])
 
+    # Testa se a magnitude mínima do upload pode ser alterada
     def test_magnitude_minima_configuravel(self):
         resposta = self.enviar(csv_usgs(LINHA_CSV.format(id="b", mag=1.2, tipo="earthquake")),
                                magnitude_minima=0)
         self.assertEqual(resposta.json()["novos"], 1)
 
+    # Testa se um CSV sem as colunas obrigatórias devolve erro 400
     def test_colunas_ausentes_400(self):
         resposta = self.enviar(csv_usgs("a,4.5", cabecalho="id,mag"))
         self.assertEqual(resposta.status_code, 400)
         self.assertIn("Colunas ausentes", resposta.json()["mensagem"])
         self.assertEqual(Coleta.objects.get().status, Coleta.Status.ERRO)
 
+    # Testa se um arquivo com extensão não aceita devolve erro 400
     def test_extensao_invalida_400(self):
         arquivo = SimpleUploadedFile("dados.txt", b"id,mag", content_type="text/plain")
         resposta = self.enviar(arquivo)
@@ -396,6 +448,7 @@ class UploadCsvTests(TestCase):
         self.assertIn("arquivo", resposta.json())
         self.assertFalse(Coleta.objects.exists())
 
+    # Testa se o upload sem arquivo devolve erro 400
     def test_sem_arquivo_400(self):
         resposta = self.cliente.post("/api/coletas/upload/", {}, format="multipart")
         self.assertEqual(resposta.status_code, 400)
@@ -404,9 +457,11 @@ class UploadCsvTests(TestCase):
 class UploadJsonXmlTests(TestCase):
     """Upload de .json (lista, objeto com lista e GeoJSON) e .xml."""
 
+    # Prepara o cliente da API para os testes de upload de JSON e XML
     def setUp(self):
         self.cliente = APIClient()
 
+    # Envia um arquivo com o nome e o conteúdo dados para a rota de upload
     def enviar(self, nome, conteudo, **campos):
         arquivo = SimpleUploadedFile(nome, conteudo.encode("utf-8"))
         return self.cliente.post("/api/coletas/upload/", {"arquivo": arquivo, **campos},
@@ -415,16 +470,19 @@ class UploadJsonXmlTests(TestCase):
     REGISTRO = {"id": "a", "mag": 4.6, "time": 1759276800000, "latitude": 38.2,
                 "longitude": 142.0, "depth": 40.0, "place": "10 km E of Sendai, Japan"}
 
+    # Testa o upload de um JSON com uma lista de registros
     def test_json_lista_de_registros(self):
         resposta = self.enviar("dados.json", json.dumps([self.REGISTRO, {**self.REGISTRO, "id": "b"}]))
         self.assertEqual(resposta.status_code, 201, resposta.json())
         self.assertEqual(resposta.json()["novos"], 2)
         self.assertEqual(Terremoto.objects.get(usgs_id="a").local, "10 km E of Sendai, Japan")
 
+    # Testa o upload de um JSON com a lista dentro de um objeto
     def test_json_objeto_com_lista_dentro(self):
         resposta = self.enviar("dados.json", json.dumps({"terremotos": [self.REGISTRO]}))
         self.assertEqual(resposta.json()["novos"], 1, resposta.json())
 
+    # Testa o upload de um GeoJSON no formato do USGS
     def test_geojson_do_usgs(self):
         feature = {"type": "Feature", "id": "g1",
                    "properties": {"mag": 5.1, "time": 1759276800000, "place": "Chile", "type": "earthquake"},
@@ -435,6 +493,7 @@ class UploadJsonXmlTests(TestCase):
         self.assertEqual((terremoto.latitude, terremoto.longitude, terremoto.profundidade_km),
                          (-33.4, -70.6, 25.0))
 
+    # Testa o upload de um arquivo XML
     def test_xml(self):
         linhas = "".join(
             "<evento>" + "".join(f"<{k}>{v}</{k}>" for k, v in {**self.REGISTRO, "id": i}.items()) + "</evento>"
@@ -443,21 +502,25 @@ class UploadJsonXmlTests(TestCase):
         self.assertEqual(resposta.status_code, 201, resposta.json())
         self.assertEqual(resposta.json()["novos"], 2)
 
+    # Testa se um JSON sem coluna obrigatória devolve erro 400
     def test_json_sem_coluna_obrigatoria_400(self):
         resposta = self.enviar("dados.json", json.dumps([{"id": "a", "mag": 4.0}]))
         self.assertEqual(resposta.status_code, 400)
         self.assertIn("Colunas ausentes no JSON", resposta.json()["mensagem"])
 
+    # Testa se um XML sem coluna obrigatória devolve erro 400
     def test_xml_sem_coluna_obrigatoria_400(self):
         resposta = self.enviar("dados.xml", "<t><e><id>a</id><mag>4.0</mag></e></t>")
         self.assertEqual(resposta.status_code, 400)
         self.assertIn("Colunas ausentes no XML", resposta.json()["mensagem"])
 
+    # Testa se um JSON mal formado devolve erro 400
     def test_json_invalido_400(self):
         resposta = self.enviar("dados.json", "{isto não é json")
         self.assertEqual(resposta.status_code, 400)
         self.assertIn("Não foi possível ler o JSON", resposta.json()["mensagem"])
 
+    # Testa se um XML mal formado devolve erro 400
     def test_xml_invalido_400(self):
         resposta = self.enviar("dados.xml", "<abre><sem-fechar>")
         self.assertEqual(resposta.status_code, 400)
@@ -466,6 +529,7 @@ class UploadJsonXmlTests(TestCase):
 
 
 class MlTests(TestCase):
+    # Usa uma pasta temporária para os modelos treinados nos testes
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -473,16 +537,19 @@ class MlTests(TestCase):
         cls.override = override_settings(PASTA_MODELOS=Path(cls.pasta))
         cls.override.enable()
 
+    # Apaga a pasta temporária dos modelos ao fim dos testes
     @classmethod
     def tearDownClass(cls):
         cls.override.disable()
         shutil.rmtree(cls.pasta, ignore_errors=True)
         super().tearDownClass()
 
+    # Prepara o cliente da API e a base sintética para os testes de ML
     def setUp(self):
         self.cliente = APIClient()
         criar_base_sintetica()
 
+    # Testa a validação dos parâmetros dos algoritmos
     def test_validacao_de_parametros(self):
         with self.assertRaises(ml.ErroModelo):
             ml.validar_parametros("random_forest", {"n_estimators": 0})
@@ -492,6 +559,7 @@ class MlTests(TestCase):
             ml.validar_parametros("knn", {})  # desativado
         self.assertEqual(ml.validar_parametros("gradient_boosting", {})["max_depth"], 3)
 
+    # Testa se só terremotos com magnitude maior que o alvo contam
     def test_magnitude_igual_ao_alvo_nao_conta(self):
         df = ml._dataframe(Terremoto.objects.all())
         painel, _ = ml.montar_painel(df.assign(magnitude=4.0), 4.0, 1.0)
@@ -499,6 +567,7 @@ class MlTests(TestCase):
         painel, _ = ml.montar_painel(df.assign(magnitude=4.1), 4.0, 1.0)
         self.assertGreater(painel["alvo"].sum(), 0)
 
+    # Testa se as features de um período usam só períodos anteriores
     def test_painel_nao_usa_o_futuro(self):
         """A feature de um período só pode depender de períodos anteriores."""
         df = ml._dataframe(Terremoto.objects.all())
@@ -507,6 +576,7 @@ class MlTests(TestCase):
         np.testing.assert_array_equal(celula["eventos_periodo_anterior"].iloc[1:].to_numpy(),
                                       celula["n_alvo"].iloc[:-1].to_numpy())
 
+    # Testa se todos os algoritmos disponíveis treinam e deixam um modelo ativo
     def test_treina_todos_os_algoritmos(self):
         for algoritmo in ml.ALGORITMOS:
             resposta = self.cliente.post("/api/modelos/", {"algoritmo": algoritmo},
@@ -515,6 +585,7 @@ class MlTests(TestCase):
             self.assertIsNotNone(resposta.json()["metricas"]["roc_auc"])
         self.assertEqual(ModeloTreinado.objects.filter(ativo=True).count(), 1)
 
+    # Testa se a previsão usa o modelo ativo e acha o foco mais ativo
     def test_previsao_e_ativacao(self):
         primeiro = self.cliente.post("/api/modelos/", {"algoritmo": "random_forest"},
                                      format="json").json()
@@ -528,12 +599,14 @@ class MlTests(TestCase):
         centros = [(c["centro"]["latitude"], c["centro"]["longitude"]) for c in dados["celulas"]]
         self.assertIn((35.5, 140.5), centros)
 
+    # Testa a previsão para um ponto e o erro para um ponto fora do mapa
     def test_previsao_por_ponto_e_fora_da_regiao(self):
         self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting"}, format="json")
         ponto = self.cliente.get("/api/previsoes/?latitude=35.3&longitude=140.2").json()
         self.assertEqual(ponto["total_celulas"], 1)
         self.assertEqual(self.cliente.get("/api/previsoes/?latitude=95&longitude=-70").status_code, 400)
 
+    # Testa se a previsão por região devolve só as localidades dela
     def test_previsao_por_regiao(self):
         self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting"}, format="json")
         Terremoto.objects.filter(latitude__gte=38, latitude__lt=39).update(zona="asia")
@@ -543,14 +616,17 @@ class MlTests(TestCase):
         self.assertEqual(dados["celulas"][0]["centro"], {"latitude": 38.5, "longitude": 142.5})
         self.assertEqual(self.cliente.get("/api/previsoes/?regiao=nao-existe").status_code, 400)
 
+    # Testa se a previsão sem nenhum modelo treinado devolve erro 404
     def test_sem_modelo_404(self):
         self.assertEqual(self.cliente.get("/api/previsoes/").status_code, 404)
 
+    # Testa se treinar com uma magnitude-alvo sem casos devolve erro 400
     def test_magnitude_alvo_sem_casos_400(self):
         resposta = self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting", "magnitude_alvo": 7.5},
                                      format="json")
         self.assertEqual(resposta.status_code, 400)
 
+    # Testa se o re-treino busca os últimos 6 anos no USGS antes de treinar
     @mock.patch("api.services.usgs.buscar_terremotos")
     def test_retreino_atualiza_dados_com_6_anos(self, buscar):
         buscar.return_value = [feature_usgs("novo", mag=5.5, lat=35.4, lon=140.3)]
@@ -560,6 +636,7 @@ class MlTests(TestCase):
         buscar.assert_called_once_with(6, 2.5)
         self.assertTrue(Terremoto.objects.filter(usgs_id="novo").exists())
 
+    # Testa se apagar um modelo também remove o arquivo dele
     def test_apagar_modelo_remove_arquivo(self):
         modelo = self.cliente.post("/api/modelos/", {"algoritmo": "gradient_boosting"}, format="json").json()
         arquivo = ml.settings.PASTA_MODELOS / ModeloTreinado.objects.get(pk=modelo["id"]).arquivo
@@ -569,9 +646,11 @@ class MlTests(TestCase):
 
 
 class ImportacaoPorRegiaoTests(TestCase):
+    # Prepara uma região de teste para a importação por região
     def setUp(self):
         self.regiao = criar_regiao()
 
+    # Testa a importação de uma região pela API
     @mock.patch("api.services.usgs.buscar_terremotos")
     def test_importa_a_regiao_pela_api(self, buscar):
         buscar.return_value = [feature_usgs("a")]
@@ -581,12 +660,14 @@ class ImportacaoPorRegiaoTests(TestCase):
         # consulta só as caixas da região, com a magnitude de completude dela
         buscar.assert_called_once_with(2, 4.0, self.regiao.caixas)
 
+    # Testa se a falha do USGS na importação da região devolve 502
     @mock.patch("api.services.usgs.buscar_terremotos", side_effect=ErroUSGS("fora do ar"))
     def test_usgs_fora_do_ar_na_importacao_da_regiao(self, _):
         resposta = APIClient().post("/api/regioes/japan/importar/", {"anos": 2}, format="json")
         self.assertEqual(resposta.status_code, 502)
         self.assertEqual(Coleta.objects.get().status, Coleta.Status.ERRO)
 
+    # Testa se importar uma região inexistente devolve erro 404
     def test_importar_regiao_inexistente_404(self):
         resposta = APIClient().post("/api/regioes/atlantida/importar/", {}, format="json")
         self.assertEqual(resposta.status_code, 404)
@@ -595,11 +676,13 @@ class ImportacaoPorRegiaoTests(TestCase):
 class CorrecaoDeContinentesTests(TestCase):
     """O Natural Earth põe a Rússia inteira na Europa e a Guiana Francesa na França."""
 
+    # Testa as correções da Rússia e da Guiana Francesa nos continentes
     def test_russia_e_guiana_francesa(self):
         from api.management.commands.carregar_regioes import _partes_por_continente
         from shapely.geometry import box, shape
         from shapely.ops import unary_union
 
+        # Monta um país de teste no formato do Natural Earth
         def pais(nome, continente, *caixas):
             return {"properties": {"ADMIN": nome, "CONTINENT": continente},
                     "geometry": {"type": "MultiPolygon", "coordinates": [

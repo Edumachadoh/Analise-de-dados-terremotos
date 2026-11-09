@@ -17,6 +17,7 @@ from api.services.usgs import ErroUSGS
 class Command(BaseCommand):
     help = "Importa terremotos do mundo inteiro a partir da API do USGS ou de um CSV."
 
+    # Define os argumentos do comando: anos, magnitude mínima e arquivo CSV
     def add_arguments(self, parser):
         parser.add_argument("--anos", type=int, default=settings.ANOS_COLETA_PADRAO,
                             help="anos para trás, a partir de hoje (padrão: %(default)s)")
@@ -25,6 +26,7 @@ class Command(BaseCommand):
         parser.add_argument("--arquivo", default=None,
                             help="CSV com as colunas do USGS, em vez da API")
 
+    # Importa os terremotos do USGS ou de um arquivo CSV para o banco
     def handle(self, *args, **opcoes):
         try:
             if opcoes["arquivo"]:

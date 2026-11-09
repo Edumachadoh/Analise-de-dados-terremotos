@@ -28,6 +28,7 @@ COLUNAS = ["id", "mag", "magType", "time", "updated", "place", "tsunami", "alert
 class Command(BaseCommand):
     help = "Baixa os terremotos de um período do USGS e salva em CSV na pasta data/."
 
+    # Define os argumentos do comando: período (--de, --ate) e magnitude mínima
     def add_arguments(self, parser):
         parser.add_argument("--de", type=int, required=True,
                             help="início do período, em anos atrás (ex.: 6)")
@@ -37,6 +38,7 @@ class Command(BaseCommand):
                             default=settings.MAGNITUDE_MINIMA_COLETA,
                             help="magnitude mínima (padrão: %(default)s)")
 
+    # Baixa os terremotos do período no USGS e salva em um CSV
     def handle(self, *args, **opcoes):
         de, ate, magnitude = opcoes["de"], opcoes["ate"], opcoes["magnitude_minima"]
         if de <= ate:

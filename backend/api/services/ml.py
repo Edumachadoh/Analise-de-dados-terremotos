@@ -169,6 +169,7 @@ ALGORITMOS = {
 }
 
 
+# Lista os algoritmos disponíveis e seus parâmetros para a API
 def listar_algoritmos() -> list[dict]:
     """Algoritmos e parâmetros, no formato devolvido pela API (sem a classe Python)."""
     return [
@@ -178,6 +179,7 @@ def listar_algoritmos() -> list[dict]:
     ]
 
 
+# Valida os parâmetros enviados para o algoritmo e completa com os padrões
 def validar_parametros(algoritmo: str, parametros: dict | None) -> dict:
     """
     Confere os parâmetros enviados pelo usuário e completa com os padrões.
@@ -224,6 +226,7 @@ def validar_parametros(algoritmo: str, parametros: dict | None) -> dict:
     return validados
 
 
+# Converte o texto das camadas da rede neural (ex.: 32,16) em uma tupla de inteiros
 def _camadas(texto: str) -> tuple[int, ...]:
     try:
         camadas = tuple(int(n) for n in texto.split(",") if n.strip())
@@ -234,6 +237,7 @@ def _camadas(texto: str) -> tuple[int, ...]:
     return camadas
 
 
+# Monta o pipeline do scikit-learn: padronização (se preciso) e classificador
 def criar_pipeline(algoritmo: str, parametros: dict) -> Pipeline:
     """Monta o Pipeline do scikit-learn: [padronização] -> classificador."""
     info = ALGORITMOS[algoritmo]
@@ -254,11 +258,13 @@ def criar_pipeline(algoritmo: str, parametros: dict) -> Pipeline:
 # =============================================================================
 # Preparação dos dados: tabela célula x período
 # =============================================================================
+# Seleciona os terremotos usados pelo ML (acima da magnitude de completude)
 def _base(magnitude_alvo: float):
     """Os terremotos usados pelo ML: só os acima da magnitude de completude."""
     return Terremoto.objects.filter(magnitude__gte=min(MAGNITUDE_COMPLETUDE, magnitude_alvo))
 
 
+# Converte os terremotos do banco em DataFrame com as colunas usadas pelo ML
 def _dataframe(queryset) -> pd.DataFrame:
     df = pd.DataFrame.from_records(
         queryset.values("data_hora", "latitude", "longitude", "magnitude", "zona")
@@ -269,11 +275,13 @@ def _dataframe(queryset) -> pd.DataFrame:
     return df
 
 
+# Calcula o canto da célula da grade que contém a coordenada
 def _celula(valor, origem, tamanho):
     """Canto da célula que contém o valor: origem + n * tamanho."""
     return np.round(origem + np.floor((valor - origem) / tamanho) * tamanho, 4)
 
 
+# Marca em cada terremoto a célula e o período de 30 dias a que pertence
 def celulas_e_periodos(df: pd.DataFrame, tamanho_celula: float) -> tuple[pd.DataFrame, int, pd.Timestamp]:
     """
     Acrescenta a cada terremoto a célula e o período (0 = o mais antigo).
@@ -298,6 +306,7 @@ def celulas_e_periodos(df: pd.DataFrame, tamanho_celula: float) -> tuple[pd.Data
     return df[df["periodo"] >= 0], n_periodos, referencia
 
 
+# Monta a tabela célula x período com o alvo e as features de histórico
 def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float,
                   incluir_proximo: bool = False) -> tuple[pd.DataFrame, pd.Timestamp]:
     """
@@ -353,10 +362,12 @@ def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float
 # =============================================================================
 # Treino e avaliação
 # =============================================================================
+# Calcula as métricas do modelo e do baseline no conjunto de teste
 def _metricas(y, prob, baseline) -> dict:
     previsto = (prob >= 0.5).astype(int)
     duas_classes = len(set(y)) > 1
 
+    # Calcula a métrica só quando o teste tem as duas classes; senão devolve None
     def seguro(funcao, *args, **kwargs):
         return round(float(funcao(*args, **kwargs)), 4) if duas_classes else None
 
@@ -371,6 +382,7 @@ def _metricas(y, prob, baseline) -> dict:
     }
 
 
+# Extrai a importância de cada feature, quando o algoritmo oferece
 def _importancias(pipeline: Pipeline) -> dict | None:
     """Importância das features, quando o algoritmo oferece."""
     modelo = pipeline.named_steps["classificador"]
@@ -383,6 +395,7 @@ def _importancias(pipeline: Pipeline) -> dict | None:
     return {f: round(float(v), 4) for f, v in sorted(zip(FEATURES, valores), key=lambda x: -x[1])}
 
 
+# Treina, avalia e salva um modelo, que passa a ser o ativo
 def treinar(algoritmo: str, parametros: dict | None = None, magnitude_alvo: float = 4.0,
             meses_teste: int = 6, tamanho_celula: float = 1.0,
             anos: int | None = None) -> ModeloTreinado:
@@ -446,6 +459,7 @@ def treinar(algoritmo: str, parametros: dict | None = None, magnitude_alvo: floa
     return modelo
 
 
+# Torna o modelo o ativo nas previsões, desativando os demais
 @transaction.atomic
 def ativar(modelo: ModeloTreinado) -> ModeloTreinado:
     """Torna este o modelo usado nas previsões (só um fica ativo)."""
@@ -458,6 +472,7 @@ def ativar(modelo: ModeloTreinado) -> ModeloTreinado:
 # =============================================================================
 # Previsão
 # =============================================================================
+# Carrega do disco o arquivo do modelo treinado
 def _carregar(modelo: ModeloTreinado):
     caminho = settings.PASTA_MODELOS / modelo.arquivo if modelo.arquivo else None
     if not caminho or not Path(caminho).exists():
@@ -465,6 +480,7 @@ def _carregar(modelo: ModeloTreinado):
     return joblib.load(caminho)
 
 
+# Calcula a probabilidade de terremoto de cada localidade nos próximos 30 dias
 def prever(modelo: ModeloTreinado, latitude: float | None = None,
            longitude: float | None = None, limite: int | None = None,
            regiao: str | None = None) -> dict:
