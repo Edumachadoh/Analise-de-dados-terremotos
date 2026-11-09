@@ -1,9 +1,10 @@
-// Tela 3: correlação entre as colunas, tabela paginada de terremotos (GET /api/terremotos/), histórico de coletas
-// e importação de dados novos (POST /api/coletas/ busca no USGS; envio de arquivo aguarda o back)
+// Tela 3: correlação entre as colunas, tabela paginada de terremotos (GET /api/terremotos/), histórico de coletas,
+// importação de dados novos (POST /api/coletas/ busca no USGS; envio de arquivo aguarda o back) e limpeza da base
+// (DELETE /api/terremotos/limpar/)
 
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { api } from '../api/index.js'
-import { Aviso, Cabecalho, Carregando, Cartao, Icone } from '../componentes/comuns.jsx'
+import { Aviso, Cabecalho, Carregando, Cartao, Confirmacao, Icone } from '../componentes/comuns.jsx'
 import { comCorte } from '../componentes/Filtros.jsx'
 import { MatrizCorrelacao } from '../componentes/graficos.jsx'
 import { formatarData, formatarInteiro, formatarNumero } from '../lib/formato.js'
@@ -37,6 +38,10 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
   const [pagina, setPagina] = useState(1)
   const [ordenacao, setOrdenacao] = useState('-data_hora')
   const [filtrosVistos, setFiltrosVistos] = useState(filtros)
+  const [confirmandoLimpeza, setConfirmandoLimpeza] = useState(false)
+  const [limpando, setLimpando] = useState(false)
+  const [mensagemLimpeza, setMensagemLimpeza] = useState(null)
+  const fecharConfirmacao = useCallback(() => setConfirmandoLimpeza(false), [])
 
   // Filtro novo volta para a primeira página (ajuste durante a renderização, sem efeito extra)
   if (filtrosVistos !== filtros) {
@@ -58,14 +63,46 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
     setOrdenacao(ordenacao === campo ? `-${campo}` : campo)
   }
 
+  async function limparBase() {
+    setLimpando(true)
+    setMensagemLimpeza(null)
+    try {
+      const { apagados } = await api.limparTerremotos()
+      setMensagemLimpeza({ tipo: 'ok', texto: `Base de dados limpa: ${formatarInteiro(apagados)} terremotos apagados.` })
+      setPagina(1)
+      aoMudarBase()
+    } catch (e) {
+      setMensagemLimpeza({ tipo: 'erro', texto: e.message })
+    } finally {
+      setLimpando(false)
+      setConfirmandoLimpeza(false)
+    }
+  }
+
   return (
     <>
       <Cabecalho titulo={`Dados · ${regiao.nome}`}>Tabela completa dos terremotos da região, com os filtros da barra lateral, e importação de dados novos</Cabecalho>
 
       <Importacao regiao={regiao} aoImportar={aoMudarBase} />
 
+      {mensagemLimpeza && <div style={{ marginBottom: 16 }}><Aviso tipo={mensagemLimpeza.tipo}>{mensagemLimpeza.texto}</Aviso></div>}
+
+      {confirmandoLimpeza && (
+        <Confirmacao titulo="Limpar base de dados?" ocupado={limpando} aoConfirmar={limparBase} aoCancelar={fecharConfirmacao}>
+          <p style={{ margin: 0 }}>
+            Todos os terremotos importados serão apagados, <strong>de todas as regiões</strong>, não só de {regiao.nome}.
+            Isso não pode ser desfeito.
+          </p>
+          <p style={{ margin: '8px 0 0' }}>
+            O histórico de importações e os modelos treinados continuam salvos, mas as previsões só voltam a funcionar
+            depois de importar dados de novo.
+          </p>
+        </Confirmacao>
+      )}
+
       <div className="grade-cartoes">
-        <Cartao largo titulo="Terremotos" subtitulo={`${formatarInteiro(total)} registros · clique no título de uma coluna com seta para ordenar`}>
+        <Cartao largo titulo="Terremotos" subtitulo={`${formatarInteiro(total)} registros · clique no título de uma coluna com seta para ordenar`}
+          controles={<button className="botao pequeno perigo" disabled={limpando} onClick={() => setConfirmandoLimpeza(true)}>Limpar base de dados</button>}>
           {lista.erro && <Aviso tipo="erro">{lista.erro}</Aviso>}
           {lista.dados && (
             <>

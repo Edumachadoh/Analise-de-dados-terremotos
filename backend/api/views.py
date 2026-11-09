@@ -32,12 +32,22 @@ class TerremotoViewSet(viewsets.ModelViewSet):
     local, faixa_profundidade (raso, intermediario, profundo), tsunami, alerta,
     regiao (código do continente ou oceano, ex.: america-do-sul).
     Ordenação: ?ordering=-magnitude (campos: data_hora, magnitude, profundidade_km).
+    DELETE /api/terremotos/limpar/ apaga todos os terremotos da base.
     """
     queryset = Terremoto.objects.all()
     serializer_class = TerremotoSerializer
     filterset_class = TerremotoFilter
     ordering_fields = ["data_hora", "magnitude", "profundidade_km"]
     ordering = ["-data_hora"]
+
+    @action(detail=False, methods=["delete"])
+    def limpar(self, request):
+        """
+        Apaga todos os terremotos, de todas as regiões, sem considerar filtros. O histórico de
+        importações e os modelos treinados continuam no banco.
+        """
+        apagados, _ = Terremoto.objects.all().delete()
+        return Response({"apagados": apagados})
 
 
 class RegiaoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -206,7 +216,7 @@ class ModeloViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
     POST treina um novo modelo, que passa a ser o ativo. Exemplo:
         {"algoritmo": "random_forest",
          "parametros": {"n_estimators": 200, "max_depth": 10},
-         "magnitude_alvo": 4.5,
+         "magnitude_alvo": 4.0,
          "atualizar_dados": true}
     Com atualizar_dados=true, busca no USGS os últimos 6 anos antes de treinar
     (re-treino com dados novos).
@@ -262,8 +272,9 @@ class PrevisaoViewSet(viewsets.ViewSet):
     Probabilidade de terremoto por região nos próximos 30 dias.
 
     Parâmetros: modelo (padrão: o ativo), latitude e longitude (só a célula do
-    ponto), limite (as N regiões mais prováveis).
-    Exemplo: /api/previsoes/?limite=10
+    ponto), limite (as N localidades mais prováveis), regiao (só as localidades
+    dessa região).
+    Exemplo: /api/previsoes/?regiao=america-do-sul&limite=1
     """
 
     def list(self, request):
@@ -280,7 +291,7 @@ class PrevisaoViewSet(viewsets.ViewSet):
                                 status=status.HTTP_404_NOT_FOUND)
         try:
             resultado = ml.prever(modelo, dados.get("latitude"), dados.get("longitude"),
-                                  dados.get("limite"))
+                                  dados.get("limite"), dados.get("regiao"))
         except ml.ErroModelo as erro:
             raise ValidationError({"detail": str(erro)}) from erro
         return Response(resultado)

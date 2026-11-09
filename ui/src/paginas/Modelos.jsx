@@ -1,29 +1,30 @@
-// Tela 4: treinar modelos de previsão, comparar com o baseline e escolher o modelo ativo
-// (GET /api/modelos/algoritmos/, GET/POST /api/modelos/, POST /api/modelos/{id}/ativar/, DELETE /api/modelos/{id}/)
+// Treinar modelos de previsão, ver a localidade mais provável da região em análise, comparar com o
+// baseline e escolher o modelo ativo (GET /api/modelos/algoritmos/, GET/POST /api/modelos/,
+// POST /api/modelos/{id}/ativar/, DELETE /api/modelos/{id}/, GET /api/previsoes/)
 
 import { useEffect, useState } from 'react'
+import { Rectangle, Tooltip } from 'react-leaflet'
 import { api } from '../api/index.js'
 import { Aviso, Cabecalho, Carregando, Cartao, Metrica, Seletor } from '../componentes/comuns.jsx'
 import { BarrasHorizontais } from '../componentes/graficos.jsx'
+import { MapaBase } from '../componentes/MapaBase.jsx'
 import { formatarData, formatarInteiro, formatarNumero, formatarPorcentagem } from '../lib/formato.js'
 import { rotulo } from '../lib/rotulos.js'
 import { useCarregar } from '../lib/useCarregar.js'
 
-// O back só aceita estes três textos exatos (ChoiceField com 0.5, 1.0 e 2.0)
-const TAMANHOS_CELULA = [['0.5', '0,5° (≈ 55 km)'], ['1.0', '1° (≈ 110 km)'], ['2.0', '2° (≈ 220 km)']]
+// Folga em volta da localidade no mapa, em graus: só o quadrado, sem contexto, não diz onde ele fica
+const FOLGA_MAPA = 6
 
 const padroes = (algoritmo) =>
   Object.fromEntries(Object.entries(algoritmo?.parametros ?? {}).map(([nome, p]) => [nome, p.padrao ?? '']))
 
-export default function Modelos({ aoMudarBase }) {
+export default function Modelos({ regiao, codigoRegiao, versaoBase, aoMudarBase }) {
   const algoritmos = useCarregar(() => api.listarAlgoritmos(), [])
   const modelos = useCarregar(() => api.listarModelos(), [])
 
   const [algoritmoId, setAlgoritmoId] = useState('random_forest')
   const [parametros, setParametros] = useState({})
-  const [magnitudeAlvo, setMagnitudeAlvo] = useState(4.5)
   const [mesesTeste, setMesesTeste] = useState(6)
-  const [tamanhoCelula, setTamanhoCelula] = useState('1.0')
   const [atualizarDados, setAtualizarDados] = useState(false)
   const [treinando, setTreinando] = useState(false)
   const [mensagem, setMensagem] = useState(null)
@@ -42,12 +43,11 @@ export default function Modelos({ aoMudarBase }) {
     setTreinando(true)
     setMensagem(null)
     try {
+      // Magnitude (> 4) e tamanho da localidade (1°, cerca de 110 km) fazem parte da pergunta: ficam nos padrões do back
       const modelo = await api.treinar({
         algoritmo: algoritmo.id,
         parametros: montarParametros(algoritmo, parametros),
-        magnitude_alvo: Number(magnitudeAlvo),
         meses_teste: Number(mesesTeste),
-        tamanho_celula: tamanhoCelula,
         atualizar_dados: atualizarDados,
       })
       setSelecionado(modelo.id)
@@ -84,8 +84,8 @@ export default function Modelos({ aoMudarBase }) {
   return (
     <>
       <Cabecalho titulo="Modelos">
-        Prevê <strong>quais regiões do Chile têm mais chance de um terremoto forte nos próximos 30 dias</strong>. O Chile é dividido
-        em células e o modelo aprende com o histórico de cada uma.
+        <strong>Nos próximos 30 dias, qual localidade tem a maior probabilidade de ter um terremoto de magnitude maior que 4?</strong>{' '}
+        Analisando: <strong>{regiao.nome}</strong>. Cada localidade é uma área de cerca de 110 × 110 km, em terra ou no mar.
       </Cabecalho>
 
       {api.local && (
@@ -97,95 +97,136 @@ export default function Modelos({ aoMudarBase }) {
       {algoritmos.erro && <Aviso tipo="erro">{algoritmos.erro}</Aviso>}
 
       <div className="modelos">
-        <Cartao titulo="Treinar um modelo" subtitulo="Escolha o algoritmo e o que ele deve prever">
+        <Cartao titulo="Treinar um modelo" subtitulo="Escolha o algoritmo">
           {!algoritmos.dados && !algoritmos.erro && <Carregando />}
           {algoritmos.dados && (
-            <>
-              <div className="lista-modelos">
-                {algoritmos.dados.map((a) => (
-                  <button key={a.id} className={`opcao-modelo${a.id === algoritmo?.id ? ' ativo' : ''}`} onClick={() => setAlgoritmoId(a.id)}>
-                    <strong>{a.nome}</strong>
-                    <span>{a.descricao}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="formulario">
-                <div className="linha">
-                  {Object.entries(algoritmo.parametros).map(([nome, p]) => (
-                    <Parametro key={nome} nome={nome} definicao={p} valor={parametros[nome] ?? ''}
-                      aoMudar={(v) => setParametros({ ...parametros, [nome]: v })} />
-                  ))}
-                </div>
-
-                <div className="linha">
-                  <label className="campo">
-                    Magnitude mínima a prever
-                    <input type="number" step="0.1" min="2.5" max="8" value={magnitudeAlvo} onChange={(e) => setMagnitudeAlvo(e.target.value)} />
-                    <span className="dica-campo">Prevê terremotos com esta magnitude ou mais</span>
-                  </label>
-                  <label className="campo">
-                    Meses de teste
-                    <input type="number" min="1" max="24" value={mesesTeste} onChange={(e) => setMesesTeste(e.target.value)} />
-                    <span className="dica-campo">Últimos meses guardados para avaliar o modelo</span>
-                  </label>
-                </div>
-
-                <Seletor rotulo="Tamanho de cada região" valor={tamanhoCelula} opcoes={TAMANHOS_CELULA} aoMudar={setTamanhoCelula} inline={false} />
-
-                <label className="check">
-                  <input type="checkbox" checked={atualizarDados} onChange={(e) => setAtualizarDados(e.target.checked)} />
-                  <span>Buscar dados novos no USGS antes de treinar (re-treino com os últimos 6 anos; pode levar alguns minutos)</span>
-                </label>
-
-                <button className="botao primario" disabled={treinando} onClick={treinar}>
-                  {treinando ? (atualizarDados ? 'Buscando dados e treinando…' : 'Treinando…') : 'Treinar modelo'}
+            <div className="lista-modelos">
+              {algoritmos.dados.map((a) => (
+                <button key={a.id} className={`opcao-modelo${a.id === algoritmo?.id ? ' ativo' : ''}`} onClick={() => setAlgoritmoId(a.id)}>
+                  <strong>{a.nome}</strong>
+                  <span>{a.descricao}</span>
                 </button>
-              </div>
-            </>
+              ))}
+            </div>
           )}
         </Cartao>
 
-        <div className="coluna">
-          {mensagem && <Aviso tipo={mensagem.tipo}>{mensagem.texto}</Aviso>}
-
-          <Cartao titulo="Modelos treinados" subtitulo="O modelo ativo é o usado na tela Previsões">
-            {modelos.erro && <Aviso tipo="erro">{modelos.erro}</Aviso>}
-            {modelos.dados && lista.length === 0 && <div className="vazio">Nenhum modelo treinado ainda. Configure ao lado e clique em “Treinar modelo”.</div>}
-            {lista.length > 0 && (
-              <div className="tabela-rolagem">
-                <table>
-                  <thead>
-                    <tr><th>Nº</th><th>Algoritmo</th><th>Magnitude</th><th>Treinado em</th><th>Precisão média</th><th>vs baseline</th><th /></tr>
-                  </thead>
-                  <tbody>
-                    {lista.map((m) => (
-                      <tr key={m.id} style={m.id === detalhe?.id ? { background: 'var(--superficie-2)' } : undefined}>
-                        <td>{m.id}</td>
-                        <td>{m.algoritmo_nome} {m.ativo && <span className="etiqueta ok">ativo</span>}</td>
-                        <td className="num">≥ {formatarNumero(m.magnitude_alvo)}</td>
-                        <td>{formatarData(m.treinado_em)}</td>
-                        <td className="num">{formatarPorcentagem(m.metricas.precisao_media)}</td>
-                        <td>{m.metricas.supera_baseline ? <span className="etiqueta ok">supera</span> : <span className="etiqueta">não supera</span>}</td>
-                        <td style={{ whiteSpace: 'normal' }}>
-                          <span className="controles" style={{ flexWrap: 'wrap', minWidth: 150 }}>
-                            <button className="botao pequeno" onClick={() => setSelecionado(m.id)}>Detalhes</button>
-                            {!m.ativo && <button className="botao pequeno" onClick={() => ativar(m)}>Ativar</button>}
-                            <button className="botao pequeno" onClick={() => excluir(m)}>Excluir</button>
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        <Cartao titulo="Parâmetros" subtitulo={algoritmo ? `Ajustes do ${algoritmo.nome}` : undefined}>
+          {!algoritmos.dados && !algoritmos.erro && <Carregando />}
+          {algoritmo && (
+            <div className="formulario">
+              <div className="linha">
+                {Object.entries(algoritmo.parametros).map(([nome, p]) => (
+                  <Parametro key={nome} nome={nome} definicao={p} valor={parametros[nome] ?? ''}
+                    aoMudar={(v) => setParametros({ ...parametros, [nome]: v })} />
+                ))}
+                <label className="campo">
+                  Meses de teste
+                  <span className="dica-campo">
+                    Quantos meses mais recentes ficam fora do treino para medir o acerto em dados que o modelo não viu.
+                    Depois da avaliação, o modelo final aprende com todos os meses.
+                  </span>
+                  <input type="number" min="1" max="24" value={mesesTeste} onChange={(e) => setMesesTeste(e.target.value)} />
+                </label>
               </div>
-            )}
-          </Cartao>
 
-          {detalhe && <Detalhe modelo={detalhe} />}
-        </div>
+              <label className="check">
+                <input type="checkbox" checked={atualizarDados} onChange={(e) => setAtualizarDados(e.target.checked)} />
+                <span>Buscar dados novos no USGS antes de treinar (re-treino com os últimos 6 anos; pode levar alguns minutos)</span>
+              </label>
+
+              <button className="botao primario" disabled={treinando} onClick={treinar}>
+                {treinando ? (atualizarDados ? 'Buscando dados e treinando…' : 'Treinando…') : 'Treinar modelo'}
+              </button>
+            </div>
+          )}
+        </Cartao>
+      </div>
+
+      <div className="coluna">
+        {mensagem && <Aviso tipo={mensagem.tipo}>{mensagem.texto}</Aviso>}
+
+        {detalhe && <LocalidadeProvavel modelo={detalhe} regiao={regiao} codigoRegiao={codigoRegiao} versaoBase={versaoBase} />}
+        {detalhe && <Detalhe modelo={detalhe} />}
+
+        <Cartao titulo="Modelos treinados" subtitulo="O modelo ativo é o usado na aba Mapa de probabilidade">
+          {modelos.erro && <Aviso tipo="erro">{modelos.erro}</Aviso>}
+          {modelos.dados && lista.length === 0 && <div className="vazio">Nenhum modelo treinado ainda. Configure acima e clique em “Treinar modelo”.</div>}
+          {lista.length > 0 && (
+            <div className="tabela-rolagem">
+              <table>
+                <thead>
+                  <tr><th>Nº</th><th>Algoritmo</th><th>Magnitude</th><th>Treinado em</th><th>Precisão média</th><th>vs baseline</th><th /></tr>
+                </thead>
+                <tbody>
+                  {lista.map((m) => (
+                    <tr key={m.id} style={m.id === detalhe?.id ? { background: 'var(--superficie-2)' } : undefined}>
+                      <td>{m.id}</td>
+                      <td>{m.algoritmo_nome} {m.ativo && <span className="etiqueta ok">ativo</span>}</td>
+                      <td className="num">&gt; {formatarNumero(m.magnitude_alvo)}</td>
+                      <td>{formatarData(m.treinado_em)}</td>
+                      <td className="num">{formatarPorcentagem(m.metricas.precisao_media)}</td>
+                      <td>{m.metricas.supera_baseline ? <span className="etiqueta ok">supera</span> : <span className="etiqueta">não supera</span>}</td>
+                      <td style={{ whiteSpace: 'normal' }}>
+                        <span className="controles" style={{ flexWrap: 'wrap', minWidth: 150 }}>
+                          <button className="botao pequeno" onClick={() => setSelecionado(m.id)}>Detalhes</button>
+                          {!m.ativo && <button className="botao pequeno" onClick={() => ativar(m)}>Ativar</button>}
+                          <button className="botao pequeno" onClick={() => excluir(m)}>Excluir</button>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Cartao>
       </div>
     </>
+  )
+}
+
+// A resposta da pergunta para o modelo mostrado: a localidade mais provável da região em análise
+function LocalidadeProvavel({ modelo, regiao, codigoRegiao, versaoBase }) {
+  const { dados, erro, carregando } = useCarregar(
+    () => api.previsoes({ modelo: modelo.id, regiao: codigoRegiao, limite: 1 }),
+    [modelo.id, codigoRegiao, versaoBase],
+  )
+  const c = dados?.celulas[0]
+
+  return (
+    <Cartao titulo={`Localidade com maior probabilidade · ${regiao.nome}`}
+      subtitulo={`Segundo o ${modelo.algoritmo_nome} (nº ${modelo.id})`}>
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      {carregando && <Carregando texto="Calculando a previsão…" />}
+      {!carregando && c && (
+        <>
+          <MapaBase chave={`${modelo.id}-${codigoRegiao}-${c.latitude_min}-${c.longitude_min}`}
+            limites={[[c.latitude_min - FOLGA_MAPA, c.longitude_min - FOLGA_MAPA], [c.latitude_max + FOLGA_MAPA, c.longitude_max + FOLGA_MAPA]]}>
+            <Rectangle bounds={[[c.latitude_min, c.longitude_min], [c.latitude_max, c.longitude_max]]}
+              pathOptions={{ color: '#d9480f', weight: 2, fillColor: '#d9480f', fillOpacity: 0.35 }}>
+              <Tooltip sticky>
+                <strong>Probabilidade: {formatarPorcentagem(c.probabilidade)}</strong><br />
+                Centro: {formatarNumero(c.centro.latitude, 2)}°, {formatarNumero(c.centro.longitude, 2)}°
+              </Tooltip>
+            </Rectangle>
+          </MapaBase>
+
+          <div className="metricas" style={{ marginTop: 14 }}>
+            <Metrica rotulo="Probabilidade" valor={formatarPorcentagem(c.probabilidade)}
+              detalhe={`de magnitude > ${formatarNumero(dados.magnitude_alvo)} em 30 dias`} />
+            <Metrica rotulo="Centro da localidade" valor={`${formatarNumero(c.centro.latitude, 2)}°, ${formatarNumero(c.centro.longitude, 2)}°`}
+              detalhe="latitude, longitude" />
+            <Metrica rotulo="Eventos em 12 meses" valor={formatarInteiro(c.eventos_ultimos_12_periodos)}
+              detalhe="nesta localidade, acima da magnitude prevista" />
+            <Metrica rotulo="Frequência histórica" valor={formatarPorcentagem(c.taxa_historica)}
+              detalhe="dos períodos de 30 dias tiveram um evento" />
+            <Metrica rotulo="Período previsto" valor={formatarData(dados.periodo_previsto.inicio)}
+              detalhe={`até ${formatarData(dados.periodo_previsto.fim)}`} />
+          </div>
+        </>
+      )}
+    </Cartao>
   )
 }
 
@@ -211,9 +252,9 @@ function Parametro({ nome, definicao: p, valor, aoMudar }) {
   return (
     <label className="campo">
       {rotulo(nome)}
+      <span className="dica-campo">{p.descricao}</span>
       <input type={numerico ? 'number' : 'text'} min={p.min} max={p.max} step={p.tipo === 'int' ? 1 : 'any'} value={valor}
         placeholder={p.nulo ? 'sem limite' : undefined} onChange={(e) => aoMudar(e.target.value)} />
-      <span className="dica-campo">{p.descricao}</span>
     </label>
   )
 }
@@ -226,11 +267,11 @@ function Detalhe({ modelo }) {
 
   return (
     <Cartao titulo={`Resultado · ${modelo.algoritmo_nome} (nº ${modelo.id})`}
-      subtitulo={`Prevê terremotos de magnitude ≥ ${formatarNumero(modelo.magnitude_alvo)} em regiões de ${formatarNumero(modelo.tamanho_celula)}° · ${formatarInteiro(modelo.total_terremotos)} terremotos de ${formatarData(modelo.dados_inicio)} a ${formatarData(modelo.dados_fim)}`}>
+      subtitulo={`Prevê terremotos de magnitude > ${formatarNumero(modelo.magnitude_alvo)} em localidades de ${formatarNumero(modelo.tamanho_celula)}° · ${formatarInteiro(modelo.total_terremotos)} terremotos de ${formatarData(modelo.dados_inicio)} a ${formatarData(modelo.dados_fim)}`}>
       <Aviso tipo={m.supera_baseline ? 'ok' : ''}>
         {m.supera_baseline
-          ? 'Este modelo supera o baseline: acerta mais que simplesmente repetir a frequência histórica de cada região.'
-          : 'Este modelo não supera o baseline: não é melhor que simplesmente repetir a frequência histórica de cada região. Tente outro algoritmo, outros parâmetros ou mais dados.'}
+          ? 'Este modelo supera o baseline: acerta mais que simplesmente repetir a frequência histórica de cada localidade.'
+          : 'Este modelo não supera o baseline: não é melhor que simplesmente repetir a frequência histórica de cada localidade. Tente outro algoritmo, outros parâmetros ou mais dados.'}
       </Aviso>
 
       <div className="metricas">
@@ -246,7 +287,7 @@ function Detalhe({ modelo }) {
       <p className="texto-explicacao">
         Avaliado em {formatarInteiro(m.amostras_teste)} casos de teste (os meses mais recentes, que o modelo não viu no treino);
         em {formatarPorcentagem(m.taxa_positivos_teste)} deles houve um terremoto do tamanho previsto. O baseline usa só a frequência
-        histórica de cada região. “Precisão” e “recall” usam o corte de 50% de probabilidade.
+        histórica de cada localidade. “Precisão” e “recall” usam o corte de 50% de probabilidade.
       </p>
 
       {importancias && (

@@ -65,6 +65,8 @@ export const apiTerremoto = {
   // `tamanho` (opcional) vira ?page_size=; sem ele, o back entrega 50 por página
   listarTerremotos: (filtros, pagina = 1, ordenacao = '-data_hora', tamanho) =>
     requisitar(`/terremotos/${consulta(filtros, { page: pagina, ordering: ordenacao, page_size: tamanho })}`),
+  // Apaga todos os terremotos da base (todas as regiões); devolve { apagados }
+  limparTerremotos: () => requisitar('/terremotos/limpar/', { method: 'DELETE' }),
 
   // ---------------------------------------------------------------- estatísticas
   resumo: (filtros) => requisitar(`/estatisticas/${consulta(filtros)}`),

@@ -1,4 +1,5 @@
-// Tela 5: probabilidade de terremoto por região nos próximos 30 dias (GET /api/previsoes/)
+// Tela 4: abre nos modelos de ML; a outra aba mostra a probabilidade de terremoto por localidade
+// da região em análise nos próximos 30 dias (GET /api/previsoes/)
 
 import { useMemo, useState } from 'react'
 import { Rectangle, Tooltip } from 'react-leaflet'
@@ -7,12 +8,32 @@ import { Aviso, Cabecalho, Carregando, Cartao, Metrica, Seletor } from '../compo
 import { corDaRampa, MapaBase, RAMPA } from '../componentes/MapaBase.jsx'
 import { formatarData, formatarInteiro, formatarNumero, formatarPorcentagem } from '../lib/formato.js'
 import { useCarregar } from '../lib/useCarregar.js'
+import Modelos from './Modelos.jsx'
 
-const LIMITES = [['10', '10 regiões'], ['25', '25 regiões'], ['50', '50 regiões'], ['', 'Todas (mais lento)']]
+const LIMITES = [['10', '10 localidades'], ['25', '25 localidades'], ['50', '50 localidades'], ['', 'Todas (mais lento)']]
+const ABAS = [['modelos', 'Modelos de ML'], ['mapa', 'Mapa de probabilidade']]
 
-export default function Previsoes({ versaoBase }) {
+export default function Previsoes({ regiao, codigoRegiao, versaoBase, aoMudarBase }) {
+  const [aba, setAba] = useState('modelos')
+
+  return (
+    <>
+      <div className="abas">
+        {ABAS.map(([id, nome]) => (
+          <button key={id} className={aba === id ? 'ativo' : ''} onClick={() => setAba(id)}>{nome}</button>
+        ))}
+      </div>
+      {aba === 'modelos'
+        ? <Modelos regiao={regiao} codigoRegiao={codigoRegiao} versaoBase={versaoBase} aoMudarBase={aoMudarBase} />
+        : <MapaPrevisoes regiao={regiao} codigoRegiao={codigoRegiao} versaoBase={versaoBase} />}
+    </>
+  )
+}
+
+function MapaPrevisoes({ regiao, codigoRegiao, versaoBase }) {
   const [limite, setLimite] = useState('50')
-  const { dados, erro, carregando } = useCarregar(() => api.previsoes({ limite }), [limite, versaoBase])
+  const { dados, erro, carregando } = useCarregar(() => api.previsoes({ limite, regiao: codigoRegiao }),
+    [limite, codigoRegiao, versaoBase])
 
   const celulas = useMemo(() => dados?.celulas ?? [], [dados])
   const maxima = celulas.length ? Math.max(...celulas.map((c) => c.probabilidade)) : 1
@@ -27,10 +48,10 @@ export default function Previsoes({ versaoBase }) {
   return (
     <>
       <Cabecalho titulo="Previsões">
-        Probabilidade de cada região do Chile ter um terremoto nos próximos 30 dias, segundo o modelo ativo
+        Probabilidade de cada localidade de <strong>{regiao.nome}</strong> ter um terremoto nos próximos 30 dias, segundo o modelo ativo
       </Cabecalho>
 
-      {semModelo && <Aviso>Não há um modelo ativo. Vá até a tela <strong>Modelos</strong>, treine um novo ou ative um existente e volte aqui.</Aviso>}
+      {semModelo && <Aviso>Não há um modelo ativo. Vá até a aba <strong>Modelos de ML</strong>, treine um novo ou ative um existente e volte aqui.</Aviso>}
       {erro && !semModelo && <Aviso tipo="erro">{erro}</Aviso>}
       {carregando && !dados && !erro && <Carregando texto="Calculando as previsões… (o back leva alguns segundos)" />}
 
@@ -38,17 +59,17 @@ export default function Previsoes({ versaoBase }) {
         <>
           <div className="metricas">
             <Metrica rotulo="Modelo ativo" valor={`nº ${dados.modelo}`} detalhe={dados.algoritmo.replaceAll('_', ' ')} />
-            <Metrica rotulo="Magnitude prevista" valor={`≥ ${formatarNumero(dados.magnitude_alvo)}`} />
+            <Metrica rotulo="Magnitude prevista" valor={`> ${formatarNumero(dados.magnitude_alvo)}`} />
             <Metrica rotulo="Período previsto" valor={formatarData(dados.periodo_previsto.inicio)}
               detalhe={`até ${formatarData(dados.periodo_previsto.fim)}`} />
-            <Metrica rotulo="Regiões exibidas" valor={formatarInteiro(dados.total_celulas)} />
+            <Metrica rotulo="Localidades exibidas" valor={formatarInteiro(dados.total_celulas)} />
           </div>
 
           <div className="grade-cartoes">
             <Cartao largo titulo="Mapa de probabilidade"
-              subtitulo="Quanto mais escura a região, maior a probabilidade · passe o mouse para ver o valor"
+              subtitulo="Quanto mais escura a localidade, maior a probabilidade · passe o mouse para ver o valor"
               controles={<Seletor rotulo="Mostrar" valor={limite} opcoes={LIMITES} aoMudar={setLimite} />}>
-              <MapaBase limites={limitesMapa} chave={`${dados.modelo}-${dados.total_celulas}`}>
+              <MapaBase limites={limitesMapa} chave={`${dados.modelo}-${codigoRegiao}-${dados.total_celulas}`}>
                 {celulas.map((c) => (
                   <Rectangle key={`${c.latitude_min}-${c.longitude_min}`}
                     bounds={[[c.latitude_min, c.longitude_min], [c.latitude_max, c.longitude_max]]}
@@ -73,11 +94,11 @@ export default function Previsoes({ versaoBase }) {
               </div>
             </Cartao>
 
-            <Cartao largo titulo="Regiões mais prováveis" subtitulo="Ordenadas da maior para a menor probabilidade">
+            <Cartao largo titulo="Localidades mais prováveis" subtitulo="Ordenadas da maior para a menor probabilidade">
               <div className="tabela-rolagem">
                 <table>
                   <thead>
-                    <tr><th>#</th><th>Região (centro)</th><th>Probabilidade</th><th /><th>Eventos em 12 meses</th><th>Frequência histórica</th></tr>
+                    <tr><th>#</th><th>Localidade (centro)</th><th>Probabilidade</th><th /><th>Eventos em 12 meses</th><th>Frequência histórica</th></tr>
                   </thead>
                   <tbody>
                     {celulas.slice(0, 50).map((c, i) => (

@@ -1,18 +1,19 @@
 """
-Machine learning: probabilidade de terremoto por região no próximo período.
+Machine learning: probabilidade de terremoto por localidade no próximo período.
 
 A pergunta respondida é:
-    "Quais regiões do mundo têm maior probabilidade de registrar um terremoto
-     de magnitude >= X nos próximos 30 dias?"
+    "Nos próximos 30 dias, qual a localidade da região X com maior probabilidade
+     de ter um terremoto de magnitude maior que 4?"
 
 Como funciona:
-1. O mundo é dividido em células (padrão: 1° x 1°, cerca de 110 km de lado).
-   Entram só as células com ao menos um terremoto na base: o resto (oceanos e
-   regiões estáveis) seria dezenas de milhares de linhas sempre negativas.
+1. O mundo é dividido em células (padrão: 1° x 1°, cerca de 110 km de lado), em
+   terra ou no mar. Entram só as células com ao menos um terremoto na base: o
+   resto seria dezenas de milhares de linhas sempre negativas.
 2. O tempo é dividido em períodos de 30 dias, contados para trás a partir do
    terremoto mais recente da base. Assim nenhum período fica incompleto.
 3. Para cada célula e período, o alvo é: houve ao menos um terremoto com
-   magnitude >= X? As features são o histórico da célula ANTES do período.
+   magnitude > X? As features são o histórico da célula ANTES do período.
+   O modelo aprende com o mundo todo; a região só filtra as células na previsão.
 4. O teste usa os últimos períodos (divisão temporal), simulando prever o
    futuro com o passado. Uma divisão aleatória deixaria o modelo "ver o futuro".
 5. Depois da avaliação, o modelo é re-treinado com todos os períodos e salvo
@@ -28,14 +29,14 @@ import pandas as pd
 from django.conf import settings
 from django.db import transaction
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+# from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (average_precision_score, f1_score, precision_score,
                              recall_score, roc_auc_score)
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
+# from sklearn.neighbors import KNeighborsClassifier
+# from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.tree import DecisionTreeClassifier
+# from sklearn.tree import DecisionTreeClassifier
 
 from ..models import ModeloTreinado, Terremoto
 
@@ -50,7 +51,7 @@ MAGNITUDE_COMPLETUDE = 4.0
 FEATURES = [
     "cel_lat",                  # posição da célula
     "cel_lon",
-    "eventos_periodo_anterior",  # terremotos >= alvo no período anterior
+    "eventos_periodo_anterior",  # terremotos > alvo no período anterior
     "eventos_3_periodos",        # ... nos 3 períodos anteriores
     "eventos_12_periodos",       # ... nos 12 períodos anteriores
     "taxa_historica",            # fração dos períodos passados com ao menos um evento
@@ -65,61 +66,69 @@ class ErroModelo(ValueError):
 # =============================================================================
 # Algoritmos disponíveis e seus parâmetros configuráveis
 # =============================================================================
-# "fixos" são parâmetros que o usuário não altera: class_weight="balanced"
-# compensa o desbalanceamento (a maioria das células não tem terremoto) e
-# random_state deixa o resultado reproduzível.
+# "fixos" são parâmetros que o usuário não altera: random_state deixa o resultado
+# reproduzível. Random Forest não usa class_weight="balanced": ele infla a saída
+# (na base real, previa 69% onde ocorreu 29%), e a tela mostra esse número como
+# probabilidade.
 ALGORITMOS = {
-    "regressao_logistica": {
-        "nome": "Regressão logística",
-        "descricao": "Modelo linear e interpretável. Serve de referência simples.",
-        "classe": LogisticRegression,
-        "padronizar": True,
-        "fixos": {"class_weight": "balanced", "max_iter": 2000},
-        "parametros": {
-            "C": {"tipo": "float", "padrao": 1.0, "min": 0.001, "max": 1000,
-                  "descricao": "Inverso da regularização: menor = modelo mais simples"},
-        },
-    },
-    "arvore_decisao": {
-        "nome": "Árvore de decisão",
-        "descricao": "Aprende regras do tipo 'se... então'. Fácil de interpretar.",
-        "classe": DecisionTreeClassifier,
-        "padronizar": False,
-        "fixos": {"class_weight": "balanced", "random_state": 42},
-        "parametros": {
-            "max_depth": {"tipo": "int", "padrao": 5, "min": 1, "max": 30,
-                          "descricao": "Profundidade máxima da árvore"},
-            "min_samples_leaf": {"tipo": "int", "padrao": 5, "min": 1, "max": 500,
-                                 "descricao": "Mínimo de amostras em cada folha"},
-        },
-    },
-    "knn": {
-        "nome": "K vizinhos mais próximos (KNN)",
-        "descricao": "Classifica pela maioria dos casos mais parecidos.",
-        "classe": KNeighborsClassifier,
-        "padronizar": True,  # KNN usa distância: sem padronizar, a maior escala domina
-        "fixos": {},
-        "parametros": {
-            "n_neighbors": {"tipo": "int", "padrao": 15, "min": 1, "max": 200,
-                            "descricao": "Número de vizinhos considerados"},
-            "weights": {"tipo": "escolha", "padrao": "uniform",
-                        "opcoes": ["uniform", "distance"],
-                        "descricao": "uniform: votos iguais; distance: vizinhos próximos pesam mais"},
-        },
-    },
+    # Desativados por enquanto: para voltar, descomente também os imports no topo do arquivo.
+    # "regressao_logistica": {
+    #     "nome": "Regressão logística",
+    #     "descricao": "Modelo linear e interpretável. Serve de referência simples.",
+    #     "classe": LogisticRegression,
+    #     "padronizar": True,
+    #     "fixos": {"class_weight": "balanced", "max_iter": 2000},
+    #     "parametros": {
+    #         "C": {"tipo": "float", "padrao": 1.0, "min": 0.001, "max": 1000,
+    #               "descricao": "Inverso da regularização: menor = modelo mais simples"},
+    #     },
+    # },
+    # "arvore_decisao": {
+    #     "nome": "Árvore de decisão",
+    #     "descricao": "Aprende regras do tipo 'se... então'. Fácil de interpretar.",
+    #     "classe": DecisionTreeClassifier,
+    #     "padronizar": False,
+    #     "fixos": {"class_weight": "balanced", "random_state": 42},
+    #     "parametros": {
+    #         "max_depth": {"tipo": "int", "padrao": 5, "min": 1, "max": 30,
+    #                       "descricao": "Profundidade máxima da árvore"},
+    #         "min_samples_leaf": {"tipo": "int", "padrao": 5, "min": 1, "max": 500,
+    #                              "descricao": "Mínimo de amostras em cada folha"},
+    #     },
+    # },
+    # "knn": {
+    #     "nome": "K vizinhos mais próximos (KNN)",
+    #     "descricao": "Classifica pela maioria dos casos mais parecidos.",
+    #     "classe": KNeighborsClassifier,
+    #     "padronizar": True,  # KNN usa distância: sem padronizar, a maior escala domina
+    #     "fixos": {},
+    #     "parametros": {
+    #         "n_neighbors": {"tipo": "int", "padrao": 15, "min": 1, "max": 200,
+    #                         "descricao": "Número de vizinhos considerados"},
+    #         "weights": {"tipo": "escolha", "padrao": "uniform",
+    #                     "opcoes": ["uniform", "distance"],
+    #                     "descricao": "uniform: votos iguais; distance: vizinhos próximos pesam mais"},
+    #     },
+    # },
     "random_forest": {
         "nome": "Random Forest",
         "descricao": "Conjunto de árvores (ensemble). Robusto e mostra a importância das features.",
         "classe": RandomForestClassifier,
         "padronizar": False,
-        "fixos": {"class_weight": "balanced", "random_state": 42, "n_jobs": -1},
+        "fixos": {"random_state": 42, "n_jobs": -1},
         "parametros": {
             "n_estimators": {"tipo": "int", "padrao": 300, "min": 10, "max": 1000,
-                             "descricao": "Número de árvores"},
+                             "descricao": "Quantas árvores votam na previsão. Mais árvores deixam o "
+                                          "resultado mais estável, mas o treino fica mais lento."},
             "max_depth": {"tipo": "int", "padrao": None, "min": 1, "max": 50, "nulo": True,
-                          "descricao": "Profundidade máxima (vazio = sem limite)"},
+                          "descricao": "Quantas perguntas em sequência cada árvore pode fazer. Mais "
+                                       "níveis captam detalhes, mas podem decorar o histórico. "
+                                       "Deixe vazio para não limitar."},
             "min_samples_leaf": {"tipo": "int", "padrao": 5, "min": 1, "max": 500,
-                                 "descricao": "Mínimo de amostras em cada folha"},
+                                 "descricao": "Quantos casos de treino (uma localidade em um período "
+                                              "de 30 dias) cada conclusão da árvore precisa ter. "
+                                              "Valores maiores tornam o modelo mais simples e menos "
+                                              "sensível a ruído."},
         },
     },
     "gradient_boosting": {
@@ -130,31 +139,37 @@ ALGORITMOS = {
         "fixos": {"random_state": 42},
         "parametros": {
             "n_estimators": {"tipo": "int", "padrao": 100, "min": 10, "max": 1000,
-                             "descricao": "Número de etapas (árvores)"},
+                             "descricao": "Quantas árvores são treinadas em sequência, cada uma "
+                                          "corrigindo os erros das anteriores. Mais árvores ajustam "
+                                          "melhor, mas o treino demora mais e pode decorar o histórico."},
             "learning_rate": {"tipo": "float", "padrao": 0.1, "min": 0.001, "max": 1,
-                              "descricao": "Taxa de aprendizado: menor = passos mais cuidadosos"},
+                              "descricao": "Quanto cada nova árvore corrige as anteriores. Valores "
+                                           "menores aprendem com mais cuidado, mas costumam precisar "
+                                           "de mais árvores."},
             "max_depth": {"tipo": "int", "padrao": 3, "min": 1, "max": 10,
-                          "descricao": "Profundidade de cada árvore"},
+                          "descricao": "Quantas perguntas em sequência cada árvore pode fazer. Neste "
+                                       "algoritmo, árvores rasas, de 2 a 5 níveis, costumam bastar."},
         },
     },
-    "rede_neural": {
-        "nome": "Rede neural (MLP)",
-        "descricao": "Perceptron multicamadas. Captura relações não lineares.",
-        "classe": MLPClassifier,
-        "padronizar": True,  # redes neurais convergem mal com escalas diferentes
-        "fixos": {"random_state": 42, "early_stopping": True},
-        "parametros": {
-            "camadas": {"tipo": "texto", "padrao": "32,16",
-                        "descricao": "Neurônios por camada oculta, separados por vírgula"},
-            "alpha": {"tipo": "float", "padrao": 0.0001, "min": 0.000001, "max": 1,
-                      "descricao": "Regularização L2"},
-            "max_iter": {"tipo": "int", "padrao": 500, "min": 50, "max": 3000,
-                         "descricao": "Máximo de épocas de treino"},
-        },
-    },
+    # "rede_neural": {
+    #     "nome": "Rede neural (MLP)",
+    #     "descricao": "Perceptron multicamadas. Captura relações não lineares.",
+    #     "classe": MLPClassifier,
+    #     "padronizar": True,  # redes neurais convergem mal com escalas diferentes
+    #     "fixos": {"random_state": 42, "early_stopping": True},
+    #     "parametros": {
+    #         "camadas": {"tipo": "texto", "padrao": "32,16",
+    #                     "descricao": "Neurônios por camada oculta, separados por vírgula"},
+    #         "alpha": {"tipo": "float", "padrao": 0.0001, "min": 0.000001, "max": 1,
+    #                   "descricao": "Regularização L2"},
+    #         "max_iter": {"tipo": "int", "padrao": 500, "min": 50, "max": 3000,
+    #                      "descricao": "Máximo de épocas de treino"},
+    #     },
+    # },
 }
 
 
+# Lista os algoritmos disponíveis e seus parâmetros para a API
 def listar_algoritmos() -> list[dict]:
     """Algoritmos e parâmetros, no formato devolvido pela API (sem a classe Python)."""
     return [
@@ -164,6 +179,7 @@ def listar_algoritmos() -> list[dict]:
     ]
 
 
+# Valida os parâmetros enviados para o algoritmo e completa com os padrões
 def validar_parametros(algoritmo: str, parametros: dict | None) -> dict:
     """
     Confere os parâmetros enviados pelo usuário e completa com os padrões.
@@ -210,6 +226,7 @@ def validar_parametros(algoritmo: str, parametros: dict | None) -> dict:
     return validados
 
 
+# Converte o texto das camadas da rede neural (ex.: 32,16) em uma tupla de inteiros
 def _camadas(texto: str) -> tuple[int, ...]:
     try:
         camadas = tuple(int(n) for n in texto.split(",") if n.strip())
@@ -220,6 +237,7 @@ def _camadas(texto: str) -> tuple[int, ...]:
     return camadas
 
 
+# Monta o pipeline do scikit-learn: padronização (se preciso) e classificador
 def criar_pipeline(algoritmo: str, parametros: dict) -> Pipeline:
     """Monta o Pipeline do scikit-learn: [padronização] -> classificador."""
     info = ALGORITMOS[algoritmo]
@@ -240,14 +258,16 @@ def criar_pipeline(algoritmo: str, parametros: dict) -> Pipeline:
 # =============================================================================
 # Preparação dos dados: tabela célula x período
 # =============================================================================
+# Seleciona os terremotos usados pelo ML (acima da magnitude de completude)
 def _base(magnitude_alvo: float):
     """Os terremotos usados pelo ML: só os acima da magnitude de completude."""
     return Terremoto.objects.filter(magnitude__gte=min(MAGNITUDE_COMPLETUDE, magnitude_alvo))
 
 
+# Converte os terremotos do banco em DataFrame com as colunas usadas pelo ML
 def _dataframe(queryset) -> pd.DataFrame:
     df = pd.DataFrame.from_records(
-        queryset.values("data_hora", "latitude", "longitude", "magnitude")
+        queryset.values("data_hora", "latitude", "longitude", "magnitude", "zona")
     )
     if df.empty:
         raise ErroModelo("Não há terremotos no banco. Importe os dados primeiro.")
@@ -255,11 +275,13 @@ def _dataframe(queryset) -> pd.DataFrame:
     return df
 
 
+# Calcula o canto da célula da grade que contém a coordenada
 def _celula(valor, origem, tamanho):
     """Canto da célula que contém o valor: origem + n * tamanho."""
     return np.round(origem + np.floor((valor - origem) / tamanho) * tamanho, 4)
 
 
+# Marca em cada terremoto a célula e o período de 30 dias a que pertence
 def celulas_e_periodos(df: pd.DataFrame, tamanho_celula: float) -> tuple[pd.DataFrame, int, pd.Timestamp]:
     """
     Acrescenta a cada terremoto a célula e o período (0 = o mais antigo).
@@ -284,6 +306,7 @@ def celulas_e_periodos(df: pd.DataFrame, tamanho_celula: float) -> tuple[pd.Data
     return df[df["periodo"] >= 0], n_periodos, referencia
 
 
+# Monta a tabela célula x período com o alvo e as features de histórico
 def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float,
                   incluir_proximo: bool = False) -> tuple[pd.DataFrame, pd.Timestamp]:
     """
@@ -297,7 +320,7 @@ def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float
     df, n_periodos, referencia = celulas_e_periodos(df, tamanho_celula)
 
     total = df.groupby(["cel_lat", "cel_lon", "periodo"]).size().rename("n_total")
-    alvo = (df[df["magnitude"] >= magnitude_alvo]
+    alvo = (df[df["magnitude"] > magnitude_alvo]
             .groupby(["cel_lat", "cel_lon", "periodo"]).size().rename("n_alvo"))
 
     # Produto cartesiano: toda célula ativa em todo período, inclusive os sem eventos
@@ -339,10 +362,12 @@ def montar_painel(df: pd.DataFrame, magnitude_alvo: float, tamanho_celula: float
 # =============================================================================
 # Treino e avaliação
 # =============================================================================
+# Calcula as métricas do modelo e do baseline no conjunto de teste
 def _metricas(y, prob, baseline) -> dict:
     previsto = (prob >= 0.5).astype(int)
     duas_classes = len(set(y)) > 1
 
+    # Calcula a métrica só quando o teste tem as duas classes; senão devolve None
     def seguro(funcao, *args, **kwargs):
         return round(float(funcao(*args, **kwargs)), 4) if duas_classes else None
 
@@ -357,6 +382,7 @@ def _metricas(y, prob, baseline) -> dict:
     }
 
 
+# Extrai a importância de cada feature, quando o algoritmo oferece
 def _importancias(pipeline: Pipeline) -> dict | None:
     """Importância das features, quando o algoritmo oferece."""
     modelo = pipeline.named_steps["classificador"]
@@ -369,7 +395,8 @@ def _importancias(pipeline: Pipeline) -> dict | None:
     return {f: round(float(v), 4) for f, v in sorted(zip(FEATURES, valores), key=lambda x: -x[1])}
 
 
-def treinar(algoritmo: str, parametros: dict | None = None, magnitude_alvo: float = 4.5,
+# Treina, avalia e salva um modelo, que passa a ser o ativo
+def treinar(algoritmo: str, parametros: dict | None = None, magnitude_alvo: float = 4.0,
             meses_teste: int = 6, tamanho_celula: float = 1.0,
             anos: int | None = None) -> ModeloTreinado:
     """
@@ -393,7 +420,7 @@ def treinar(algoritmo: str, parametros: dict | None = None, magnitude_alvo: floa
     if treino["periodo"].nunique() < PERIODOS_MINIMOS_TREINO:
         raise ErroModelo("Poucos períodos para treino. Reduza meses_teste ou importe mais anos.")
     if treino["alvo"].nunique() < 2:
-        raise ErroModelo(f"Nenhum terremoto de magnitude >= {magnitude_alvo} no período de "
+        raise ErroModelo(f"Nenhum terremoto de magnitude > {magnitude_alvo} no período de "
                          "treino. Reduza a magnitude-alvo ou importe mais anos.")
 
     pipeline = criar_pipeline(algoritmo, parametros)
@@ -432,6 +459,7 @@ def treinar(algoritmo: str, parametros: dict | None = None, magnitude_alvo: floa
     return modelo
 
 
+# Torna o modelo o ativo nas previsões, desativando os demais
 @transaction.atomic
 def ativar(modelo: ModeloTreinado) -> ModeloTreinado:
     """Torna este o modelo usado nas previsões (só um fica ativo)."""
@@ -444,6 +472,7 @@ def ativar(modelo: ModeloTreinado) -> ModeloTreinado:
 # =============================================================================
 # Previsão
 # =============================================================================
+# Carrega do disco o arquivo do modelo treinado
 def _carregar(modelo: ModeloTreinado):
     caminho = settings.PASTA_MODELOS / modelo.arquivo if modelo.arquivo else None
     if not caminho or not Path(caminho).exists():
@@ -451,12 +480,15 @@ def _carregar(modelo: ModeloTreinado):
     return joblib.load(caminho)
 
 
+# Calcula a probabilidade de terremoto de cada localidade nos próximos 30 dias
 def prever(modelo: ModeloTreinado, latitude: float | None = None,
-           longitude: float | None = None, limite: int | None = None) -> dict:
+           longitude: float | None = None, limite: int | None = None,
+           regiao: str | None = None) -> dict:
     """
-    Probabilidade de cada célula ter um terremoto de magnitude >= alvo nos
+    Probabilidade de cada célula ter um terremoto de magnitude > alvo nos
     próximos 30 dias após o terremoto mais recente da base.
     Com latitude e longitude, devolve só a célula que contém o ponto.
+    Com regiao (Regiao.codigo), só as células com algum terremoto dessa região.
     """
     salvo = _carregar(modelo)
     df = _dataframe(_base(modelo.magnitude_alvo))
@@ -473,6 +505,18 @@ def prever(modelo: ModeloTreinado, latitude: float | None = None,
             (futuro["cel_lat"] == _celula(latitude, lat_min, modelo.tamanho_celula))
             & (futuro["cel_lon"] == _celula(longitude, lon_min, modelo.tamanho_celula))
         ]
+
+    if regiao:
+        lat_min, _, lon_min, _ = settings.REGIAO_ANALISE
+        da_regiao = df[df["zona"] == regiao]
+        chaves = pd.DataFrame({
+            "cel_lat": _celula(da_regiao["latitude"], lat_min, modelo.tamanho_celula),
+            "cel_lon": _celula(da_regiao["longitude"], lon_min, modelo.tamanho_celula),
+        }).drop_duplicates()
+        futuro = futuro.merge(chaves, on=["cel_lat", "cel_lon"])
+
+    if futuro.empty:
+        raise ErroModelo("Não há localidades com histórico de terremotos para esta consulta.")
 
     futuro["probabilidade"] = salvo["pipeline"].predict_proba(futuro[salvo["features"]])[:, 1]
     futuro = futuro.sort_values("probabilidade", ascending=False)

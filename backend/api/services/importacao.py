@@ -38,14 +38,17 @@ COLUNAS_OBRIGATORIAS = {"id", "mag", "time", "latitude", "longitude", "depth"}
 # -----------------------------------------------------------------------------
 # Conversão
 # -----------------------------------------------------------------------------
+# Diz se o valor está ausente (None ou NaN)
 def _vazio(valor) -> bool:
     return valor is None or (isinstance(valor, float) and math.isnan(valor))
 
 
+# Converte o valor para número, ou None se estiver vazio
 def _num(valor, tipo=float):
     return None if _vazio(valor) else tipo(valor)
 
 
+# Converte milissegundos desde 1970 (formato do USGS) em data UTC
 def _data_ms(valor):
     """O USGS manda o tempo em milissegundos desde 1970, em UTC."""
     if _vazio(valor):
@@ -53,10 +56,12 @@ def _data_ms(valor):
     return datetime.fromtimestamp(int(valor) / 1000, tz=timezone.utc)
 
 
+# Converte o valor para texto, ou texto vazio se estiver ausente
 def _texto(valor) -> str:
     return "" if _vazio(valor) else str(valor)
 
 
+# Padroniza uma coluna de tempo (milissegundos ou data ISO) em milissegundos
 def tempo_em_ms(serie: pd.Series) -> pd.Series:
     """
     Converte uma coluna de tempo para milissegundos desde 1970 (UTC).
@@ -71,12 +76,14 @@ def tempo_em_ms(serie: pd.Series) -> pd.Series:
     return numerico.fillna(ms)
 
 
+# Converte milissegundos desde 1970 em data ISO no formato do banco
 def ms_em_texto(valor) -> str:
     """Milissegundos desde 1970 -> data ISO em UTC, no formato do banco."""
     data = _data_ms(valor)
     return "" if data is None else data.replace(tzinfo=None).isoformat(sep=" ", timespec="microseconds")
 
 
+# Cria um Terremoto (sem salvar) a partir de um registro com os campos do USGS
 def terremoto_de_registro(reg: dict) -> Terremoto:
     """
     Cria um Terremoto (ainda não salvo) a partir de um registro com os nomes
@@ -108,6 +115,7 @@ def terremoto_de_registro(reg: dict) -> Terremoto:
     )
 
 
+# Transforma uma feature GeoJSON do USGS em um registro plano
 def registro_de_feature(feature: dict) -> dict:
     """Achata uma feature GeoJSON. coordinates = [longitude, latitude, profundidade]."""
     lon, lat, prof = feature["geometry"]["coordinates"]
@@ -118,6 +126,7 @@ def registro_de_feature(feature: dict) -> dict:
 # -----------------------------------------------------------------------------
 # Gravação
 # -----------------------------------------------------------------------------
+# Grava os terremotos: insere os novos e atualiza os existentes pelo usgs_id
 @transaction.atomic
 def salvar_terremotos(terremotos: list[Terremoto]) -> tuple[int, int]:
     """
@@ -145,6 +154,7 @@ def salvar_terremotos(terremotos: list[Terremoto]) -> tuple[int, int]:
     return len(novos), len(atualizar)
 
 
+# Roda uma importação e registra o resultado ou o erro na Coleta
 def _executar(coleta: Coleta, obter_registros) -> Coleta:
     """Roda a importação e registra o resultado (ou o erro) na Coleta."""
     try:
@@ -166,6 +176,7 @@ def _executar(coleta: Coleta, obter_registros) -> Coleta:
     return coleta
 
 
+# Busca os terremotos dos últimos anos no USGS (mundo ou região) e grava no banco
 def importar_do_usgs(anos: int, magnitude_minima: float | None = None,
                      regiao: Regiao | None = None) -> Coleta:
     """
@@ -197,11 +208,13 @@ def importar_do_usgs(anos: int, magnitude_minima: float | None = None,
 FORMATOS = (".csv", ".json", ".xml")
 
 
+# Lê o conteúdo do arquivo, seja um caminho ou um arquivo enviado pela API
 def _bytes(arquivo) -> bytes:
     """Conteúdo do arquivo, seja um caminho ou um arquivo enviado pela API."""
     return arquivo.read() if hasattr(arquivo, "read") else Path(arquivo).read_bytes()
 
 
+# Converte um JSON (GeoJSON, lista ou objeto com lista) em tabela
 def _tabela_json(arquivo) -> pd.DataFrame:
     """
     Aceita três formas de JSON:
@@ -225,6 +238,7 @@ def _tabela_json(arquivo) -> pd.DataFrame:
     return pd.json_normalize(dados)
 
 
+# Lê e valida um arquivo .csv, .json ou .xml, descartando as linhas inválidas
 def ler_arquivo(arquivo, magnitude_minima: float | None = None,
                 nome: str | None = None) -> tuple[list[dict], int]:
     """
@@ -269,6 +283,7 @@ def ler_arquivo(arquivo, magnitude_minima: float | None = None,
     return df.to_dict("records"), total - len(df)
 
 
+# Importa um arquivo enviado (.csv, .json ou .xml) e registra a Coleta
 def importar_csv(arquivo, anos: int = 0, magnitude_minima: float | None = None,
                  nome: str | None = None) -> Coleta:
     """
@@ -279,6 +294,7 @@ def importar_csv(arquivo, anos: int = 0, magnitude_minima: float | None = None,
     coleta = Coleta.objects.create(anos=max(anos, 1), magnitude_minima=magnitude_minima,
                                    origem=nome[:20])
 
+    # Lê o arquivo e anota na Coleta quantas linhas foram descartadas
     def ler():
         registros, descartados = ler_arquivo(arquivo, magnitude_minima, nome)
         if descartados:

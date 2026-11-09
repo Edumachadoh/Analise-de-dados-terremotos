@@ -1,6 +1,6 @@
 # Terremotos por região — USGS
 
-Aplicação web para análise de terremotos por **região** (cada continente e cada oceano), com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS). Na interface, o usuário escolhe uma região e todas as telas (painel, mapa e dados) passam a analisar só ela. O machine learning não foi alterado: continua global, como antes.
+Aplicação web para análise de terremotos por **região** (cada continente e cada oceano), com dados do catálogo público do Serviço Geológico dos Estados Unidos (USGS). Na interface, o usuário escolhe uma região e todas as telas (painel, mapa e dados) passam a analisar só ela. A tela **Previsões** responde, com machine learning: *nos próximos 30 dias, qual localidade da região tem a maior probabilidade de ter um terremoto de magnitude maior que 4?* O modelo aprende com o mundo inteiro; a região só escolhe quais localidades entram na resposta.
 
 ## Estrutura do repositório
 
@@ -151,7 +151,7 @@ Na primeira abertura, a tela **Regiões** mostra o mapa, e o Painel e a tela Dad
 
 ### 4. Treinar o primeiro modelo
 
-As previsões só funcionam depois que existe um modelo treinado. Treine pela tela **Modelos** da interface ou pela API (veja [Endpoints da API](#endpoints-da-api)):
+As previsões só funcionam depois que existe um modelo treinado. Treine pela tela **Previsões › Modelos de ML** da interface ou pela API (veja [Endpoints da API](#endpoints-da-api)):
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/modelos/ -H "Content-Type: application/json" -d "{\"algoritmo\": \"random_forest\", \"magnitude_alvo\": 4.0}"
@@ -241,7 +241,13 @@ curl http://127.0.0.1:8000/api/coletas/                           # histórico d
 
 ### Limpar a base
 
-A API não tem um endpoint para apagar tudo de uma vez. Use o shell do Django:
+Para apagar **todos os terremotos**, use o botão **Limpar base de dados** da tela Dados, que pede confirmação ("Sim" ou "Não"), ou a API:
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/api/terremotos/limpar/
+```
+
+Os dois apagam os terremotos de todas as regiões, sem considerar filtros, e mantêm o histórico de importações e os modelos treinados. Para apagar também o histórico, ou só parte dos terremotos, use o shell do Django:
 
 ```bash
 python manage.py shell
@@ -284,13 +290,14 @@ Para saber quais ações gravam no banco, veja [O que grava no banco e o que nã
 | GET | `/api/terremotos/{id}/` | mostra um terremoto, incluindo a faixa de profundidade calculada (raso, intermediário ou profundo) |
 | PUT, PATCH | `/api/terremotos/{id}/` | altera um terremoto: todos os campos (PUT) ou só alguns (PATCH) |
 | DELETE | `/api/terremotos/{id}/` | apaga um terremoto |
+| DELETE | `/api/terremotos/limpar/` | apaga **todos** os terremotos da base, de todas as regiões, e devolve `{"apagados": N}`; ignora filtros e mantém coletas e modelos |
 | GET | `/api/estatisticas/` | resumo da base: total, magnitude média e máxima, período coberto e o terremoto mais forte |
 | GET | `/api/estatisticas/por-mes/` | quantidade e magnitude média de terremotos por mês (gráfico de linha do tempo) |
 | GET | `/api/estatisticas/por-magnitude/` | quantidade por faixa de magnitude (gráfico de barras ou pizza) |
 | GET | `/api/estatisticas/por-profundidade/` | quantidade e magnitude média por faixa de profundidade |
 | GET | `/api/estatisticas/correlacao/` | correlação de Pearson entre magnitude, profundidade, nº de estações, lacuna azimutal e rms |
-| GET | `/api/estatisticas/janelas/` | AUC de cada feature de histórico do ML, sozinha, para prever M ≥ 4,5 (células de 1°) |
-| GET | `/api/estatisticas/casos-positivos/` | fração de célula × período de 30 dias com terremoto ≥ alvo, por magnitude-alvo e tamanho de célula |
+| GET | `/api/estatisticas/janelas/` | AUC de cada feature de histórico do ML, sozinha, para prever M > 4,5 (células de 1°) |
+| GET | `/api/estatisticas/casos-positivos/` | fração de célula × período de 30 dias com terremoto acima do alvo, por magnitude-alvo e tamanho de célula |
 | GET | `/api/coletas/` | histórico de importações: quando, de onde (USGS ou nome do CSV), status e quantos eventos novos e atualizados |
 | GET | `/api/coletas/{id}/` | detalhe de uma importação, incluindo a mensagem de erro ou de linhas descartadas |
 | GET | `/api/regioes/` | os continentes e oceanos (tipo, magnitude de completude) e `total_terremotos`, quantos eventos da base pertencem a cada um. `?com_dados=true` lista só os que têm |
@@ -304,8 +311,8 @@ Para saber quais ações gravam no banco, veja [O que grava no banco e o que nã
 | GET | `/api/modelos/{id}/` | detalhe de um modelo: métricas de teste, comparação com o baseline e importância das features |
 | DELETE | `/api/modelos/{id}/` | apaga um modelo e o arquivo salvo em `media/modelos/` |
 | POST | `/api/modelos/{id}/ativar/` | escolhe qual modelo é usado nas previsões (só um fica ativo) |
-| GET | `/api/modelos/algoritmos/` | lista os 6 algoritmos disponíveis e os parâmetros configuráveis de cada um, com padrão, mínimo e máximo |
-| GET | `/api/previsoes/` | usa o modelo ativo para estimar a probabilidade de cada região ter um terremoto acima da magnitude-alvo nos próximos 30 dias |
+| GET | `/api/modelos/algoritmos/` | lista os algoritmos disponíveis (Random Forest e Gradient Boosting) e os parâmetros configuráveis de cada um, com padrão, mínimo e máximo |
+| GET | `/api/previsoes/` | usa o modelo ativo para estimar a probabilidade de cada localidade (célula de 1°) ter um terremoto acima da magnitude-alvo nos próximos 30 dias; `?regiao=` restringe às localidades da região |
 
 O painel administrativo do Django fica em `/admin/` (crie um usuário com `python manage.py createsuperuser`).
 
@@ -382,7 +389,7 @@ As três respondem com o registro da coleta:
 |---|---|---|
 | `algoritmo` | obrigatório | um dos algoritmos da tabela abaixo |
 | `parametros` | padrões do algoritmo | hiperparâmetros (veja `GET /api/modelos/algoritmos/`) |
-| `magnitude_alvo` | 4.5 | prever terremotos com magnitude ≥ este valor (2,5 a 8) |
+| `magnitude_alvo` | 4.0 | prever terremotos com magnitude maior que este valor (2,5 a 8) |
 | `meses_teste` | 6 | quantos períodos de 30 dias, os mais recentes, ficam para o teste |
 | `tamanho_celula` | 1.0 | lado da célula em graus: 0.5, 1.0 ou 2.0 |
 | `anos` | toda a base | usar só os últimos N anos da base |
@@ -390,33 +397,37 @@ As três respondem com o registro da coleta:
 
 | `algoritmo` | Nome | Parâmetros configuráveis |
 |---|---|---|
-| `regressao_logistica` | Regressão logística | `C` |
-| `arvore_decisao` | Árvore de decisão | `max_depth`, `min_samples_leaf` |
-| `knn` | K vizinhos mais próximos | `n_neighbors`, `weights` |
 | `random_forest` | Random Forest | `n_estimators`, `max_depth`, `min_samples_leaf` |
 | `gradient_boosting` | Gradient Boosting | `n_estimators`, `learning_rate`, `max_depth` |
-| `rede_neural` | Rede neural (MLP) | `camadas`, `alpha`, `max_iter` |
+
+Regressão logística, árvore de decisão, KNN e rede neural estão desativados: seguem comentados em `backend/api/services/ml.py`.
+
+A tela mostra a saída do modelo como **probabilidade**, então ela precisa estar calibrada: quando o modelo diz 70%, deve ocorrer em cerca de 70% dos casos. Por isso o Random Forest não usa `class_weight="balanced"`: com ele, na base real, o modelo previa 69% onde ocorriam 29%. Sem ele, previa 69% e ocorriam 70%. O Gradient Boosting já era calibrado.
+
+Valores que deram o melhor resultado na base de 3 anos, escolhidos em uma validação separada do teste: Random Forest com `max_depth` 12 e `min_samples_leaf` 20 (sem limite de profundidade ele só empata com o baseline, e o arquivo do modelo pode passar de 500 MB); Gradient Boosting com os padrões (100 árvores, taxa 0,1, profundidade 3).
 
 A resposta traz as métricas de teste (ROC AUC, precisão média, F1, comparação com o baseline histórico) e a importância das features. Status: 201 quando treinado, 400 quando os parâmetros são inválidos ou a base não tem dados suficientes, 502 quando `atualizar_dados` falha no USGS.
 
 ### Previsões
 
-**`GET /api/previsoes/`**: probabilidade de cada célula ter um terremoto com magnitude ≥ a magnitude-alvo do modelo nos 30 dias seguintes ao terremoto mais recente da base.
+**`GET /api/previsoes/`**: probabilidade de cada célula ter um terremoto com magnitude maior que a magnitude-alvo do modelo nos 30 dias seguintes ao terremoto mais recente da base.
 
 | Parâmetro | Descrição |
 |---|---|
 | `limite` | devolve só as N células mais prováveis |
+| `regiao` | só as células com algum terremoto dessa região (ex.: `america-do-sul`); o modelo continua aprendendo com o mundo todo |
 | `latitude`, `longitude` | devolve só a célula que contém o ponto (informe os dois) |
 | `modelo` | id do modelo; padrão: o modelo ativo |
 
 Exemplos:
 
 ```
-GET /api/previsoes/?limite=10                         # as 10 regiões mais prováveis
+GET /api/previsoes/?limite=10                         # as 10 localidades mais prováveis do mundo
+GET /api/previsoes/?regiao=america-do-sul&limite=1    # a localidade mais provável da América do Sul
 GET /api/previsoes/?latitude=35.7&longitude=139.7     # a célula de Tóquio
 ```
 
-Cada célula da resposta traz os limites de latitude e longitude, o centro, a `probabilidade`, os eventos dos últimos 12 períodos e a taxa histórica. Status: 404 quando ainda não há modelo treinado, 400 para parâmetros inválidos.
+Cada célula da resposta traz os limites de latitude e longitude, o centro, a `probabilidade`, os eventos dos últimos 12 períodos e a taxa histórica. Status: 404 quando ainda não há modelo treinado, 400 para parâmetros inválidos ou quando a região não tem localidades com histórico. A previsão é calculada na hora e leva alguns segundos (cerca de 9 s na base de 3 anos).
 
 ---
 
@@ -431,8 +442,9 @@ A interface analisa **uma região por vez**: o mundo inteiro (a escolha inicial)
 | Tela | O que mostra |
 |---|---|
 | **Regiões** | um mapa com os continentes (e a faixa de mar junto à costa) e os oceanos, e, ao lado dele, o painel da região escolhida (botão **Analisar**, importação do USGS) e a lista com o mundo inteiro e todas as regiões, com a quantidade de terremotos. Sem regiões cadastradas, um aviso pede para rodar `carregar_regioes` |
-| **Painel** | terremotos com M ≥ 4 (a magnitude de completude; o aviso no topo diz quantos ficaram de fora), em três etapas. **Localização:** mapa dos epicentros, agrupados em bolhas que se separam com o zoom (a cor da bolha é a maior magnitude do grupo), e terremotos por país. **Magnitude:** terremotos por magnitude mínima, mensagem de tsunami e faixa de profundidade. **Tempo:** terremotos por mês e poder de previsão (AUC) de cada janela de histórico do ML |
-| **Dados** | busca de dados novos no USGS (da região, ou do mundo inteiro), envio de arquivo, tabela paginada e ordenável, histórico de importações e matriz de correlação de Pearson (terremotos com M ≥ 4) |
+| **Painel** | terremotos com M ≥ 4 (a magnitude de completude; o aviso no topo diz quantos ficaram de fora), em três etapas. **Localização:** mapa dos epicentros, agrupados em bolhas que se separam com o zoom (a cor da bolha é a maior magnitude do grupo), e terremotos por país. **Magnitude:** terremotos por magnitude mínima, mensagem de tsunami e faixa de profundidade. **Tempo:** terremotos por mês |
+| **Dados** | busca de dados novos no USGS (da região, ou do mundo inteiro), envio de arquivo, tabela paginada e ordenável, botão **Limpar base de dados** (apaga todos os terremotos, após confirmação), histórico de importações e matriz de correlação de Pearson (terremotos com M ≥ 4) |
+| **Previsões** | duas abas. **Modelos de ML** (abre primeiro): à esquerda, a escolha do algoritmo (Random Forest ou Gradient Boosting); à direita, os parâmetros, cada um com uma explicação logo abaixo; depois, o mapa com a localidade mais provável da região em análise e os números dela (probabilidade, centro, eventos em 12 meses, frequência histórica); em seguida, as métricas do modelo e a comparação com o baseline; no fim, a lista de modelos treinados (detalhes, ativar, excluir). **Mapa de probabilidade:** todas as localidades da região coloridas pela probabilidade, com a tabela das mais prováveis |
 
 Os **filtros** da barra lateral (magnitude, profundidade, período, escala, tsunami, alerta e local) valem para
 Painel e Dados ao mesmo tempo. Trocar de região limpa os filtros. A região escolhida vai em todas as consultas
@@ -441,7 +453,9 @@ como `?regiao=<codigo>`; no mundo inteiro, as consultas vão sem região.
 Só o **nome das colunas** é traduzido para a tela, em [`ui/src/lib/rotulos.js`](ui/src/lib/rotulos.js); os valores aparecem
 como vêm da API (`mb`, `raso`, `reviewed`…).
 
-> As telas **Modelos** e **Previsões** existem em `ui/src/paginas/`, mas estão desativadas em `ui/src/App.jsx` (comentadas) e não usam as regiões.
+Na tela Previsões, a magnitude (> 4) e o tamanho da localidade (1°, cerca de 110 × 110 km) fazem parte da pergunta e não aparecem como campos: o treino usa os padrões da API. Trocar de região não exige treinar de novo, porque só muda quais localidades entram na resposta.
+
+O card "Poder de previsão por janela de histórico" do Painel está comentado em `Painel.jsx`, mas a chamada a `GET /api/estatisticas/janelas/` continua ativa.
 
 O mapa da tela Regiões ([`MapaRegioes.jsx`](ui/src/componentes/MapaRegioes.jsx)) desenha, sobre o OpenStreetMap, três camadas vindas de `GET /api/regioes/mapa/`: os oceanos, a faixa de mar em volta de cada continente e os continentes. São os mesmos polígonos que o back usa para decidir a região de cada terremoto.
 
@@ -458,6 +472,8 @@ Pontos da API que a interface usa e vale conhecer:
 - **Tamanho de página.** `?page_size=` é aceito (até 5.000); o mapa baixa todos os terremotos da região em poucas requisições.
 - **Estatísticas.** O Painel e a tela Dados usam `GET /api/estatisticas/…` (resumo, por mês, por profundidade, janelas e correlação).
 - **Envio de arquivo.** `POST /api/coletas/upload/` (veja [Upload de arquivos](#upload-de-arquivos-como-se-comporta)).
+- **Limpeza da base.** `DELETE /api/terremotos/limpar/`, pelo botão da tela Dados.
+- **Modelos e previsões.** `GET /api/modelos/algoritmos/`, `GET` e `POST /api/modelos/`, `POST /api/modelos/{id}/ativar/`, `DELETE /api/modelos/{id}/` e `GET /api/previsoes/?regiao=…`.
 
 ### Estrutura do front-end
 
@@ -467,14 +483,14 @@ ui/src/
 │   ├── index.js              # ponto único de acesso à API
 │   ├── cliente.js            # chamadas HTTP ao back (regiões, terremotos, estatísticas, coletas, modelos, previsões)
 │   └── erro.js               # ErroApi
-├── componentes/              # cartões, filtros, gráficos (Recharts), mapa dos epicentros e mapa das regiões (Leaflet)
+├── componentes/              # cartões, filtros, janela de confirmação, gráficos (Recharts), mapas dos epicentros, das regiões e das previsões (Leaflet)
 ├── lib/
 │   ├── rotulos.js            # tradução dos nomes das colunas
 │   ├── formato.js            # números e datas em português
 │   ├── useCarregar.js        # busca na API com estado de carregamento e erro
 │   ├── useTodosTerremotos.js # junta as páginas de terremotos da região, com progresso e cache
 │   └── analise.js            # análises do Painel calculadas no navegador
-├── paginas/                  # Regioes, Painel, Dados (Modelos e Previsoes existem, mas estão desligadas)
+├── paginas/                  # Regioes, Painel, Dados e Previsoes (que mostra Modelos.jsx na aba Modelos de ML)
 └── App.jsx                   # navegação, região escolhida e filtros compartilhados
 ```
 
@@ -548,39 +564,39 @@ Os comandos para carregar, exportar e limpar os dados estão em [Comandos da bas
 
 ### Base atual
 
-Números da base de desenvolvimento (importação global antiga, M ≥ 2,5, mais as importações por região); a sua pode ser diferente.
+Números da base de desenvolvimento em 08/11/2026; a sua pode ser diferente.
 
 | | |
 |---|---|
-| Terremotos | 165.163 |
-| Com magnitude ≥ 4 | 97.366 |
-| Magnitude | de 2,5 a 8,8 |
-| Período | 31/10/2020 a 02/11/2026 |
+| Terremotos | 86.312 |
+| Com magnitude ≥ 4 | 52.492 |
+| Magnitude | de 2,5 a 8,2 |
+| Período | 31/10/2020 a 06/11/2026 |
 
 | Região | Terremotos |
 |---|---|
-| América do Norte | 55.269 |
-| Oceano Pacífico | 45.179 |
-| Ásia | 34.039 |
-| América do Sul | 8.093 |
-| Oceania | 8.158 |
-| Oceano Atlântico | 6.495 |
-| Oceano Índico | 3.643 |
-| Europa | 2.310 |
-| África | 1.119 |
-| Oceano Antártico | 437 |
-| Oceano Ártico | 344 |
-| Antártida | 76 |
+| América do Norte | 31.177 |
+| Oceano Pacífico | 23.578 |
+| Ásia | 14.307 |
+| Oceano Atlântico | 4.863 |
+| América do Sul | 4.451 |
+| Oceania | 3.990 |
+| Oceano Índico | 1.827 |
+| Europa | 1.144 |
+| África | 466 |
+| Oceano Antártico | 246 |
+| Oceano Ártico | 195 |
+| Antártida | 68 |
 
 ### Impacto no modelo de machine learning
 
-O modelo divide o mapa em células de 1° × 1° (cerca de 110 km de lado) e estima, para cada uma, a probabilidade de um terremoto acima da magnitude-alvo nos próximos 30 dias. No mundo inteiro, a grade completa teria 64.800 células, e a maioria delas fica em oceanos ou em regiões estáveis que nunca registram eventos. Por isso **só entram as células com ao menos um terremoto na base**. Com a base atual e magnitude-alvo 4,0, são 5.393 células e cerca de 189 mil linhas de treino.
+O modelo divide o mapa em células de 1° × 1° (cerca de 110 km de lado) e estima, para cada uma, a probabilidade de um terremoto acima da magnitude-alvo nos próximos 30 dias. No mundo inteiro, a grade completa teria 64.800 células, e a maioria delas fica em oceanos ou em regiões estáveis que nunca registram eventos. Por isso **só entram as células com ao menos um terremoto na base**, em terra ou no mar. Com a base atual e magnitude-alvo 4,0, são 4.970 células, 72 períodos e cerca de 358 mil linhas, montadas em uns 10 segundos.
 
 ---
 
 ## Regiões: continentes e oceanos
 
-A unidade de análise é a **região**: um dos 7 continentes (África, Antártida, Ásia, Europa, América do Norte, Oceania, América do Sul) ou um dos 5 oceanos (Pacífico, Atlântico, Índico, Ártico, Antártico). Estatísticas, mapa, dados e importação do USGS são de uma região, e a interface analisa uma por vez. O machine learning (modelos e previsões) não usa as regiões.
+A unidade de análise é a **região**: um dos 7 continentes (África, Antártida, Ásia, Europa, América do Norte, Oceania, América do Sul) ou um dos 5 oceanos (Pacífico, Atlântico, Índico, Ártico, Antártico). Estatísticas, mapa, dados e importação do USGS são de uma região, e a interface analisa uma por vez. O machine learning treina com o mundo inteiro; nas previsões, a região só filtra as localidades da resposta (`?regiao=`).
 
 | Código | Região | Tipo |
 |---|---|---|
@@ -621,7 +637,7 @@ backend/
 ├── requirements.txt               # dependências Python
 ├── .env                           # SECRET_KEY, DEBUG, ALLOWED_HOSTS (não vai para o git)
 ├── db.sqlite3                     # banco de dados (criado pelo migrate; não vai para o git)
-├── media/modelos/                 # modelos treinados (.joblib), criada no primeiro treino
+├── media/modelos/                 # modelos treinados (.joblib), criada no primeiro treino (não vai para o git)
 ├── config/                        # configuração do projeto Django
 │   ├── settings.py
 │   ├── urls.py
@@ -636,7 +652,6 @@ backend/
 │   ├── admin.py
 │   ├── apps.py
 │   ├── tests.py
-│   ├── coleta.py                  # script antigo, independente da API
 │   ├── services/                  # regras de negócio
 │   │   ├── usgs.py
 │   │   ├── importacao.py
@@ -674,13 +689,12 @@ A API segue uma divisão em camadas: as **views** só recebem a requisição e d
 |---|---|
 | `models.py` | define as quatro tabelas do banco. **`Regiao`**: um continente ou oceano (polígono, faixa de costa, caixas para consultar o USGS, magnitude de completude e tamanho da célula). **`Terremoto`**: um evento do USGS (local, coordenadas, profundidade, magnitude, data, impacto, qualidade do registro e a região `zona`), com `usgs_id` único e a faixa de profundidade calculada. **`Coleta`**: o registro de cada importação (origem, status, recebidos, novos, atualizados, mensagem). **`ModeloTreinado`**: um modelo de ML (algoritmo, parâmetros, métricas, período dos dados, se é o ativo), como era. |
 | `serializers.py` | converte objetos em JSON e valida o que chega. Valida as faixas de latitude e magnitude, o upload (extensão, tamanho, magnitude mínima), os campos do treino (algoritmo e hiperparâmetros) e os parâmetros da previsão. |
-| `views.py` | os seis grupos de endpoints (ViewSets): `RegiaoViewSet` (lista, mapa e importação do USGS por região), `TerremotoViewSet` (CRUD), `EstatisticaViewSet`, `ColetaViewSet` (importação do USGS, histórico e upload de CSV), `ModeloViewSet` (treino, ativação, algoritmos) e `PrevisaoViewSet`. Decide o status HTTP de cada resposta. |
+| `views.py` | os seis grupos de endpoints (ViewSets): `RegiaoViewSet` (lista, mapa e importação do USGS por região), `TerremotoViewSet` (CRUD e limpeza da base), `EstatisticaViewSet`, `ColetaViewSet` (importação do USGS, histórico e upload de CSV), `ModeloViewSet` (treino, ativação, algoritmos) e `PrevisaoViewSet`. Decide o status HTTP de cada resposta. |
 | `urls.py` | registra os ViewSets num `DefaultRouter`, que gera as URLs de `/api/` e a página navegável com a lista de endpoints |
 | `filters.py` | `TerremotoFilter`: os filtros por parâmetro de URL (região, magnitude, profundidade, datas, coordenadas, local, faixa de profundidade, tsunami, alerta) |
 | `admin.py` | registra as quatro tabelas no painel `/admin/` (os polígonos das regiões ficam de fora do formulário) |
 | `apps.py` | configuração da aplicação `api` para o Django |
-| `tests.py` | os 47 testes automatizados (veja [Testes](#testes)) |
-| `coleta.py` | **script antigo, independente da API**: baixa uma região do USGS (`chile`, `japao`, `indonesia`, `california` ou `global`) e salva CSV em `backend/data/raw/`. Roda com `python api/coleta.py`, com os filtros no topo do arquivo. Nada na API o importa; o comando `baixar_csv` faz o mesmo papel usando o cliente da API. |
+| `tests.py` | os 63 testes automatizados (veja [Testes](#testes)) |
 
 ### Regras de negócio (`api/services/`)
 
@@ -689,8 +703,8 @@ A API segue uma divisão em camadas: as **views** só recebem a requisição e d
 | `usgs.py` | cliente da API do USGS. Monta os parâmetros (caixas, período, magnitude), refaz a requisição em falhas de rede e contorna o limite de 20.000 eventos por consulta: confere o total com `count` e divide a janela ao meio até caber. `buscar_terremotos(anos, magnitude, caixas)` baixa os últimos N anos; `buscar_periodo(inicio, fim, magnitude, caixas)` baixa um intervalo. Com várias caixas, consulta uma por vez e remove duplicatas. **Não acessa o banco.** |
 | `importacao.py` | grava os terremotos no banco. Converte GeoJSON (API do USGS) e CSV em objetos `Terremoto`; no CSV, confere as colunas obrigatórias, aceita `time` em milissegundos ou data ISO e descarta linhas inválidas. Atribui a região de cada evento (`zonas.py`), insere os novos e atualiza os existentes pelo `usgs_id` (sem duplicar), em lote, e registra o resultado numa `Coleta`. `importar_do_usgs(anos, magnitude, regiao=None)` consulta o mundo inteiro ou, com `regiao`, as caixas dela. |
 | `zonas.py` | classifica os terremotos em continentes e oceanos. `Classificador` testa muitos pontos de uma vez com o `shapely` (dentro do continente, faixa de costa, oceano); `atribuir` preenche a região de eventos ainda não salvos e `reclassificar` recalcula a base inteira, gravando só o que mudou. |
-| `estatisticas.py` | agregações para os gráficos: resumo (total, magnitudes, período, evento mais forte), contagem por mês, por faixa de magnitude e por faixa de profundidade. Recebe a consulta já filtrada. |
-| `ml.py` | machine learning. Lista os 6 algoritmos e valida os hiperparâmetros; monta a tabela **célula × período de 30 dias** com o alvo (houve terremoto ≥ magnitude-alvo?) e as features, que só olham o passado; treina com divisão temporal (os últimos períodos são o teste), calcula as métricas e compara com um baseline; salva o modelo em `media/modelos/`; e gera as previsões por célula. |
+| `estatisticas.py` | agregações para os gráficos: resumo (total, magnitudes, período, evento mais forte), contagem por mês, por faixa de magnitude e por faixa de profundidade, calculadas no banco (SQL); correlação de Pearson e as análises da tabela do ML, calculadas com pandas. Recebe a consulta já filtrada pela view. |
+| `ml.py` | machine learning. Lista os algoritmos ativos (Random Forest e Gradient Boosting) e valida os hiperparâmetros; monta a tabela **célula × período de 30 dias** com o alvo (houve terremoto com magnitude maior que o alvo?) e as features, que só olham o passado; treina com divisão temporal (os últimos períodos são o teste), calcula as métricas e compara com um baseline; salva o modelo em `media/modelos/`; e gera as previsões por célula, opcionalmente só das células de uma região. |
 
 ### Comandos do terminal (`api/management/commands/`)
 
@@ -733,7 +747,7 @@ api/models.py  ──►  db.sqlite3        insere os novos e atualiza os existe
 Resposta JSON                         201 com recebidos, novos, atualizados e mensagem
 ```
 
-Os outros endpoints seguem o mesmo caminho, trocando o serviço: a importação do USGS passa por `usgs.py` e por `zonas.py` (que atribui a região de cada evento) antes de `importacao.py`; as estatísticas usam `filters.py` (inclusive `?regiao=`) e `estatisticas.py`; o treino e as previsões usam `ml.py`, sem relação com as regiões.
+Os outros endpoints seguem o mesmo caminho, trocando o serviço: a importação do USGS passa por `usgs.py` e por `zonas.py` (que atribui a região de cada evento) antes de `importacao.py`; as estatísticas usam `filters.py` (inclusive `?regiao=`) e `estatisticas.py`; o treino e as previsões usam `ml.py`; nas previsões, `?regiao=` filtra as localidades pela região dos terremotos.
 
 ---
 
@@ -747,19 +761,21 @@ Ficam em `backend/api/tests.py` e rodam com:
 python manage.py test api
 ```
 
-São **47 testes**, em nove grupos:
+São **63 testes**, em onze grupos:
 
 | Classe | Testes | O que verifica |
 |---|---|---|
-| `TerremotoApiTests` | 6 | paginação, filtros, filtro inválido (400), CRUD completo (criar, alterar, apagar), validação das faixas de latitude e magnitude, `usgs_id` duplicado (400) |
+| `TerremotoApiTests` | 7 | paginação, filtros, filtro inválido (400), limpeza da base (apaga tudo, ignora filtros e mantém as coletas), CRUD completo (criar, alterar, apagar), validação das faixas de latitude e magnitude, `usgs_id` duplicado (400) |
 | `RegiaoTests` | 6 | filtro `?regiao=` (e código inexistente, 400), estatísticas por região, lista de regiões com a contagem de terremotos e `?com_dados=true`, detalhe (e 404), importação de região sem recorte (400) |
 | `ClassificacaoTests` | 6 | a regra de terra, costa e mar: dentro do continente, mar junto à costa vai para o continente mais próximo, mar aberto vai para o oceano, ponto fora de todos os polígonos vai para o oceano mais próximo, `reclassificar` igual a `atribuir`, importação que grava a região do evento |
 | `CorrecaoDeContinentesTests` | 1 | a Rússia a leste dos Urais vai para a Ásia e a Guiana Francesa para a América do Sul |
-| `EstatisticaTests` | 4 | resumo, resumo com filtros, contagem por faixa de magnitude e de profundidade, contagem por mês |
+| `EstatisticaTests` | 6 | resumo, resumo com filtros, contagem por faixa de magnitude e de profundidade, contagem por mês, correlação, análises do ML sem dados suficientes |
+| `AnalisesDoMlTests` | 3 | AUC das janelas de histórico, janelas por faixa e casos positivos batendo com a tabela do ML. O teste das janelas por faixa falha hoje: espera uma chave `faixas` que `/janelas/` não devolve |
 | `ImportacaoTests` | 4 | importação do USGS sem duplicar (atualiza o que já existe), conversão de coordenadas e de tempo, `POST /api/coletas/`, USGS fora do ar (502, coleta registrada com erro) |
 | `ImportacaoPorRegiaoTests` | 3 | importação de uma região pela API (consulta só as caixas dela, com a magnitude de completude), USGS fora do ar (502, coleta registrada com erro) e região inexistente (404) |
 | `UploadCsvTests` | 8 | CSV com as colunas do USGS, `time` em data ISO, reenvio que atualiza sem duplicar, descarte de magnitude baixa e de outros tipos de evento, magnitude mínima configurável, colunas ausentes (400), extensão inválida (400), envio sem arquivo (400) |
-| `MlTests` | 9 | validação dos hiperparâmetros, painel sem vazamento do futuro, treino dos 6 algoritmos, ativação de modelo, previsão geral e por ponto, ponto fora da região (400), previsão sem modelo (404), magnitude-alvo sem casos (400), re-treino que atualiza os dados, exclusão do modelo e do arquivo |
+| `UploadJsonXmlTests` | 8 | JSON em lista, JSON com a lista dentro de um objeto, GeoJSON do USGS, XML, JSON e XML sem coluna obrigatória (400), JSON e XML mal formados (400) |
+| `MlTests` | 11 | validação dos hiperparâmetros (e algoritmo desativado), magnitude igual ao alvo não conta, painel sem vazamento do futuro, treino dos algoritmos ativos, ativação de modelo, previsão geral e por ponto, ponto fora do mapa (400), previsão por região (e região sem localidades, 400), previsão sem modelo (404), magnitude-alvo sem casos (400), re-treino que atualiza os dados, exclusão do modelo e do arquivo |
 
 **Os testes automatizados não alteram nada do projeto:**
 
@@ -795,7 +811,8 @@ Além dos testes, estas verificações foram feitas com a base real durante o de
 | Importação global do USGS (3 anos, M ≥ 2,5), antes das regiões | 83 mil terremotos gravados. Revelou e corrigiu um erro do SQLite (`too many SQL variables`): a checagem dos ids existentes passou a ser feita em lotes de 10 mil. |
 | Upload do CSV de 6 a 3 anos atrás | 81.721 recebidos, 81.655 novos e 66 atualizados (os eventos da emenda): o upload não duplica |
 | Continuidade da base de 6 anos | 73 meses seguidos, sem intervalo vazio na emenda entre os dois períodos |
-| Montagem da tabela de ML com a base global | cerca de 10 segundos, 5.393 células e 189 mil linhas, com magnitude-alvo 4,0 |
+| Montagem da tabela de ML com a base global | cerca de 10 segundos, 4.970 células e 358 mil linhas (6 anos), com magnitude-alvo 4,0 |
+| Calibração e ajuste dos modelos (base de 3 anos, testados nos 6 meses mais recentes) | Gradient Boosting: precisão média 51,6% contra 49,4% do baseline. Random Forest com `class_weight="balanced"` previa probabilidades infladas (69% onde ocorriam 29%); sem ele ficou calibrado, e com profundidade 12 e folha 20 chegou a 51,4% |
 | Os 18 arquivos de `testes_upload/` | todos com o resultado esperado, rodados numa transação desfeita no fim para não gravar no banco |
 | Classificação da base em regiões (165 mil terremotos) | todos classificados em poucos minutos (o tempo é dominado pela gravação no SQLite); soma das regiões igual ao total |
 | Correção da Rússia e da Guiana Francesa | a Europa caiu de 7.664 para 2.310 terremotos e a Ásia subiu de 28.686 para 34.039 |
@@ -809,11 +826,11 @@ Além dos testes, estas verificações foram feitas com a base real durante o de
 | `python manage.py importar_terremotos` | **sim** | terremotos (novos e atualizados) e uma coleta |
 | `python manage.py importar_terremotos --arquivo x.csv` | **sim** | terremotos do CSV e uma coleta |
 | `python manage.py baixar_csv` | não | só gera um CSV em `backend/data/` |
-| `python api/coleta.py` | não | só gera um CSV em `backend/data/raw/` |
 | `python manage.py test api` | não | usa um banco temporário, apagado no fim |
 | Arquivos de `data/testes_upload/` enviados à API | **sim** | terremotos com id `teste_...` e uma coleta por envio |
 | `GET` em qualquer endpoint | não | só leitura |
 | `POST`, `PUT`, `PATCH`, `DELETE /api/terremotos/` | **sim** | cria, altera ou apaga um terremoto |
+| `DELETE /api/terremotos/limpar/` (botão **Limpar base de dados**) | **sim** | apaga todos os terremotos; coletas e modelos ficam |
 | `POST /api/coletas/` | **sim** | terremotos do USGS (mundo inteiro) e uma coleta |
 | `POST /api/regioes/{codigo}/importar/` | **sim** | terremotos do USGS da região e uma coleta |
 | `GET /api/regioes/` e `/api/regioes/mapa/` | não | só leitura |

@@ -1,5 +1,7 @@
 // Peças pequenas reaproveitadas em todas as telas
 
+import { useEffect, useRef } from 'react'
+
 export function Cabecalho({ titulo, children }) {
   return (
     <header className="cabecalho">
@@ -70,6 +72,33 @@ export function Aviso({ tipo = '', children }) {
   return <div className={`aviso ${tipo}`}>{children}</div>
 }
 
+// Janela de confirmação com "Sim" e "Não". O foco começa no "Não" e Esc também responde "Não",
+// para uma ação destrutiva não ser confirmada sem querer.
+export function Confirmacao({ titulo, children, aoConfirmar, aoCancelar, ocupado = false }) {
+  const botaoNao = useRef(null)
+
+  useEffect(() => {
+    botaoNao.current?.focus()
+    const tecla = (e) => e.key === 'Escape' && !ocupado && aoCancelar()
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [aoCancelar, ocupado])
+
+  return (
+    <div className="sobreposicao" onClick={() => !ocupado && aoCancelar()}>
+      <div className="janela" role="alertdialog" aria-modal="true" aria-labelledby="janela-titulo"
+        onClick={(e) => e.stopPropagation()}>
+        <h2 id="janela-titulo">{titulo}</h2>
+        <div className="janela-texto">{children}</div>
+        <div className="janela-botoes">
+          <button ref={botaoNao} className="botao" disabled={ocupado} onClick={aoCancelar}>Não</button>
+          <button className="botao perigo" disabled={ocupado} onClick={aoConfirmar}>{ocupado ? 'Apagando…' : 'Sim'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Carregando({ texto = 'Carregando…' }) {
   return <div className="vazio">{texto}</div>
 }
@@ -92,7 +121,7 @@ const CAMINHOS = {
   mapa: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v14m6-12v14',
   dados: 'M4 6h16M4 12h16M4 18h10',
   modelos: 'M12 3v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
-  previsoes: 'M3 12h4l3-8 4 16 3-8h4',
+  previsoes: 'M3 17l6-6 4 4 8-8m0 0h-5m5 0v5',
   upload: 'M12 16V4m0 0-5 5m5-5 5 5M4 20h16',
   globo: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z',
 }
