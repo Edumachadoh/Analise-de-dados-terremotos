@@ -60,16 +60,13 @@ cd Analise-de-dados-terremotos
 
 Todos os comandos desta etapa são rodados dentro de `backend/`.
 
-**2.1. Criar e ativar o ambiente virtual**
+**2.1. Criar e ativar o ambiente virtual e tiva-lo**
 
 ```bash
 cd backend
 python -m venv .venv
+.venv\Scripts\activate
 ```
-
-| Terminal | Ativação |
-|---|
-| `.venv\Scripts\activate` |
 
 Com o ambiente ativo, o terminal mostra `(.venv)` no início da linha.
 
