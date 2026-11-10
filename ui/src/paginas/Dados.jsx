@@ -199,7 +199,8 @@ function Importacao({ regiao, aoImportar }) {
     setMensagem(null)
     try {
       const coleta = await acao()
-      setMensagem({ tipo: 'ok', texto: `Importação concluída: ${formatarInteiro(coleta.recebidos)} recebidos, ${formatarInteiro(coleta.novos)} novos e ${formatarInteiro(coleta.atualizados)} atualizados.` })
+      const descartes = coleta.mensagem ? ` ${coleta.mensagem}` : '' // ex.: "3 linha(s) descartada(s)..."
+      setMensagem({ tipo: 'ok', texto: `Importação concluída: ${formatarInteiro(coleta.recebidos)} recebidos, ${formatarInteiro(coleta.novos)} novos e ${formatarInteiro(coleta.atualizados)} atualizados.${descartes}` })
     } catch (e) {
       setMensagem({ tipo: 'erro', texto: e.message })
     } finally {
