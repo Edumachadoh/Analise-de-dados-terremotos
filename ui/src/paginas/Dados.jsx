@@ -146,7 +146,7 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
           {lista.carregando && !lista.dados && <Carregando />}
         </Cartao>
 
-        <Cartao largo titulo="Histórico de importações" subtitulo="Cada vez que os dados são buscados no USGS, a importação fica registrada aqui">
+        <Cartao largo titulo="Histórico de importações" subtitulo="Cada busca no USGS ou arquivo enviado fica registrado aqui">
           {coletas.erro && <Aviso tipo="erro">{coletas.erro}</Aviso>}
           {coletas.dados && (
             <div className="tabela-rolagem">
