@@ -1,5 +1,5 @@
 // Tela 3: correlação entre as colunas, tabela paginada de terremotos (GET /api/terremotos/), histórico de coletas,
-// importação de dados novos (POST /api/coletas/ busca no USGS; envio de arquivo aguarda o back) e limpeza da base
+// importação de dados novos (POST /api/coletas/ busca no USGS; POST /api/coletas/upload/ envia um arquivo) e limpeza da base
 // (DELETE /api/terremotos/limpar/)
 
 import { useCallback, useMemo, useRef, useState } from 'react'
@@ -199,7 +199,8 @@ function Importacao({ regiao, aoImportar }) {
     setMensagem(null)
     try {
       const coleta = await acao()
-      setMensagem({ tipo: 'ok', texto: `Importação concluída: ${formatarInteiro(coleta.recebidos)} recebidos, ${formatarInteiro(coleta.novos)} novos e ${formatarInteiro(coleta.atualizados)} atualizados.` })
+      const descartes = coleta.mensagem ? ` ${coleta.mensagem}` : '' // ex.: "3 linha(s) descartada(s)..."
+      setMensagem({ tipo: 'ok', texto: `Importação concluída: ${formatarInteiro(coleta.recebidos)} recebidos, ${formatarInteiro(coleta.novos)} novos e ${formatarInteiro(coleta.atualizados)} atualizados.${descartes}` })
     } catch (e) {
       setMensagem({ tipo: 'erro', texto: e.message })
     } finally {

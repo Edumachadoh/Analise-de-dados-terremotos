@@ -299,7 +299,7 @@ def importar_csv(arquivo, anos: int = 0, magnitude_minima: float | None = None,
         registros, descartados = ler_arquivo(arquivo, magnitude_minima, nome)
         if descartados:
             coleta.mensagem = f"{descartados} linha(s) descartada(s) por dados inválidos, " \
-                              "tipo diferente de terremoto ou magnitude abaixo da mínima."
+            "tipo diferente de terremoto, magnitude abaixo da mínima ou id repetido no arquivo."
         return registros
 
     return _executar(coleta, ler)

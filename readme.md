@@ -520,7 +520,7 @@ descartados.
 | Arquivo válido | 201 | Aviso verde: "Importação concluída: X recebidos, Y novos e Z atualizados." |
 | Reenvio de eventos que já existem | 201 | Os eventos contam como "atualizados"; nada é duplicado |
 | Colunas extras no arquivo | 201 | Aceito; as colunas extras são ignoradas |
-| Algumas linhas inválidas (latitude fora da faixa, magnitude vazia ou com texto, data inválida, tipo diferente de terremoto, magnitude abaixo da mínima, id repetido no arquivo) | 201 | Importa as linhas boas e descarta as ruins. Aviso verde com as contagens, e a quantidade descartada aparece na coluna **Mensagem** do histórico |
+| Algumas linhas inválidas (latitude fora da faixa, magnitude vazia ou com texto, data inválida, tipo diferente de terremoto, magnitude abaixo da mínima, id repetido no arquivo) | 201 | Importa as linhas boas e descarta as ruins. Aviso verde com as contagens e a quantidade de linhas descartadas, que também aparece na coluna **Mensagem** do histórico |
 | Só o cabeçalho, sem linhas | 201 | "0 recebidos, 0 novos e 0 atualizados" |
 | **Coluna obrigatória faltando** ou com nome errado (ex.: `latitud`) | 400, com a coleta registrada como `erro` | Aviso vermelho: "Colunas ausentes no CSV: ['mag']" (ou "no JSON" / "no XML"; lista todas as que faltam). A importação aparece no histórico com situação `erro` |
 | Separador `;` (padrão do Excel em português) | 400, coleta `erro` | Aviso vermelho de colunas ausentes (o back não reconhece o separador) |
