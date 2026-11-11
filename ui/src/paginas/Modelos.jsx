@@ -84,8 +84,8 @@ export default function Modelos({ regiao, codigoRegiao, versaoBase, aoMudarBase 
   return (
     <>
       <Cabecalho titulo="Modelos">
-        <strong>Nos próximos 30 dias, qual localidade tem a maior probabilidade de ter um terremoto de magnitude maior que 4?</strong>{' '}
-        Analisando: <strong>{regiao.nome}</strong>. Cada localidade é uma área de cerca de 110 × 110 km, em terra ou no mar.
+        <strong>Nos próximos 30 dias, qual localidade tem a maior probabilidade de ter um terremoto de magnitude maior que 4?</strong><br />
+        Analisando: <strong>{regiao.nome}</strong>. <br />Cada localidade é uma área de cerca de 110 × 110 km, em terra ou no mar.
       </Cabecalho>
 
       {api.local && (

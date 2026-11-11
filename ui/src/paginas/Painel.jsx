@@ -125,7 +125,7 @@ function Analise({ filtros, periodo, versaoBase }) {
       )}
 
       <Cartao largo={semTsunami} titulo="Terremotos por faixa de profundidade"
-        subtitulo={`Raso: até 70 km · intermediário: 70 a 300 km · profundo: mais de 300 km · ${formatarPorcentagem(a.profundidade10, 0)} com profundidade de exatamente 10 km (valor-padrão do USGS)`}>
+        subtitulo={`Raso: até 70 km · intermediário: 70 a 300 km · profundo: mais de 300 km · ${formatarPorcentagem(a.profundidade10, 0)} com profundidade de exatamente 10 km`}>
         {porProfundidade.dados ? (
           <Rosca dados={porProfundidade.dados.map((d) => ({ nome: d.faixa, valor: d.total }))} />
         ) : <Carregando />}
@@ -133,7 +133,7 @@ function Analise({ filtros, periodo, versaoBase }) {
 
       <Etapa numero="3" titulo="Tempo" />
 
-      <Cartao largo titulo="Terremotos por mês" subtitulo="Meses incompletos no início e no fim da base excluídos">
+      <Cartao largo titulo="Terremotos por mês">
         {meses ? (
           <Linha dados={meses} chaveX="mes" chaveY="total" rotuloY="Terremotos" formatarX={formatarMes} />
         ) : <Carregando />}

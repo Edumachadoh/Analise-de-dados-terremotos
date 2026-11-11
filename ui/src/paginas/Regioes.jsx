@@ -46,7 +46,7 @@ export default function Regioes({ regiaoAtual, versaoBase, aoAnalisar, aoMudarBa
 
   return (
     <>
-      <Cabecalho titulo="Escolha uma região">Continentes e oceanos são analisados separadamente · o mar até uns 200 km da costa conta como parte do continente</Cabecalho>
+      <Cabecalho titulo="Escolha uma região"/>
 
       {regioes.erro && <Aviso tipo="erro">{regioes.erro}</Aviso>}
       {regioes.carregando && !regioes.dados && <Carregando texto="Carregando as regiões…" />}
@@ -60,7 +60,7 @@ export default function Regioes({ regiaoAtual, versaoBase, aoAnalisar, aoMudarBa
       {regioes.dados && (
         <div className="regioes-layout">
           <Cartao largo titulo="Mapa das regiões"
-            subtitulo="Clique numa região, aqui ou na lista ao lado · a faixa clara em volta de cada continente é o mar que conta como dele">
+            subtitulo="Selecione a região desejada">
             {poligonos.erro && <Aviso tipo="erro">{poligonos.erro}</Aviso>}
             {poligonos.dados && <MapaRegioes poligonos={poligonos.dados} regioes={lista} escolhida={escolhida} aoEscolher={setEscolhida} />}
             {!poligonos.dados && !poligonos.erro && <Carregando texto="Desenhando o mapa…" />}

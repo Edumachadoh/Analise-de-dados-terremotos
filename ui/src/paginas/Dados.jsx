@@ -81,7 +81,7 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
 
   return (
     <>
-      <Cabecalho titulo={`Dados · ${regiao.nome}`}>Tabela completa dos terremotos da região, com os filtros da barra lateral, e importação de dados novos</Cabecalho>
+      <Cabecalho titulo={`Dados · ${regiao.nome}`}/>
 
       <Importacao regiao={regiao} aoImportar={aoMudarBase} />
 
@@ -101,7 +101,7 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
       )}
 
       <div className="grade-cartoes">
-        <Cartao largo titulo="Terremotos" subtitulo={`${formatarInteiro(total)} registros · clique no título de uma coluna com seta para ordenar`}
+        <Cartao largo titulo="Terremotos" subtitulo={`${formatarInteiro(total)} registros`}
           controles={<button className="botao pequeno perigo" disabled={limpando} onClick={() => setConfirmandoLimpeza(true)}>Limpar base de dados</button>}>
           {lista.erro && <Aviso tipo="erro">{lista.erro}</Aviso>}
           {lista.dados && (
@@ -146,7 +146,7 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
           {lista.carregando && !lista.dados && <Carregando />}
         </Cartao>
 
-        <Cartao largo titulo="Histórico de importações" subtitulo="Cada vez que os dados são buscados no USGS, a importação fica registrada aqui">
+        <Cartao largo titulo="Histórico de importações">
           {coletas.erro && <Aviso tipo="erro">{coletas.erro}</Aviso>}
           {coletas.dados && (
             <div className="tabela-rolagem">
@@ -161,9 +161,9 @@ export default function Dados({ filtros, regiao, versaoBase, aoMudarBase }) {
                       <td>{c.origem === 'usgs' ? 'API do USGS' : c.origem}</td>
                       <td>{c.anos} {c.anos === 1 ? 'ano' : 'anos'}{c.magnitude_minima != null && ` · M ≥ ${formatarNumero(c.magnitude_minima)}`}</td>
                       <td><span className={`etiqueta ${c.status === 'concluida' ? 'ok' : c.status === 'erro' ? 'erro' : ''}`}>{c.status}</span></td>
-                      <td className="num">{formatarInteiro(c.recebidos)}</td>
-                      <td className="num">{formatarInteiro(c.novos)}</td>
-                      <td className="num">{formatarInteiro(c.atualizados)}</td>
+                      <td>{formatarInteiro(c.recebidos)}</td>
+                      <td>{formatarInteiro(c.novos)}</td>
+                      <td>{formatarInteiro(c.atualizados)}</td>
                       <td>{c.mensagem}</td>
                     </tr>
                   ))}
@@ -212,7 +212,7 @@ function Importacao({ regiao, aoImportar }) {
 
   return (
     <div className="grade-cartoes">
-      <Cartao titulo="Buscar dados no USGS" subtitulo={`Baixa os terremotos de ${regiao.nome} dos últimos anos; os que já existem são atualizados, não duplicados`}>
+      <Cartao titulo="Buscar dados no USGS" subtitulo={`Baixa os terremotos de ${regiao.nome} dos últimos anos`}>
         <div className="formulario-linha">
           <label className="campo">
             Últimos (anos)
@@ -233,7 +233,7 @@ function Importacao({ regiao, aoImportar }) {
         {ocupado?.startsWith('Buscando') && <p className="texto-explicacao">{ocupado}</p>}
       </Cartao>
 
-      <Cartao titulo="Enviar um arquivo" subtitulo="CSV, JSON (inclusive GeoJSON) ou XML com as colunas do USGS: id, mag, time, latitude, longitude e depth">
+      <Cartao titulo="Enviar um arquivo" subtitulo="CSV, JSON ou XML com as colunas do USGS: id, mag, time, latitude, longitude e depth">
         <div
           className={`upload${arrastando ? ' arrastando' : ''}`}
           onClick={() => entrada.current.click()}
@@ -253,7 +253,6 @@ function Importacao({ regiao, aoImportar }) {
         >
           <Icone nome="upload" tamanho={26} />
           <strong>{ocupado?.startsWith('Enviando') ? ocupado : 'Arraste um arquivo aqui ou clique para escolher'}</strong>
-          <span>Os terremotos do arquivo são somados à base; cada região mostra os que pertencem a ela</span>
           <input ref={entrada} type="file" accept={FORMATOS_ACEITOS} hidden
             onChange={(e) => {
               enviar(e.target.files[0])

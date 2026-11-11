@@ -130,7 +130,6 @@ export function MatrizCorrelacao({ colunas, valores }) {
           <span>0<br />não há relação</span>
           <span>+1<br />sobem juntas</span>
         </div>
-        <p>Fraca: -0,3 a 0,3 · moderada: 0,3 a 0,7 · forte: acima de 0,7 (em módulo)</p>
       </div>
     </>
   )
