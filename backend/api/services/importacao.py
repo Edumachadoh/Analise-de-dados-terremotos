@@ -34,6 +34,14 @@ LOTE_CONSULTA = 10_000  # ids por consulta ao verificar quais eventos já existe
 # Colunas que o arquivo enviado precisa ter para ser importado (nomes do USGS)
 COLUNAS_OBRIGATORIAS = {"id", "mag", "time", "latitude", "longitude", "depth"}
 
+# Todas as colunas lidas na importação, com a grafia do USGS. O cabeçalho do arquivo é
+# comparado sem diferenciar maiúsculas: "MAG" ou "Mag" viram "mag", e "magtype" vira "magType".
+COLUNAS_CONHECIDAS = COLUNAS_OBRIGATORIAS | {
+    "magType", "updated", "place", "tsunami", "alert", "sig", "felt", "cdi", "mmi",
+    "nst", "gap", "dmin", "rms", "status", "net", "type",
+}
+_GRAFIA_USGS = {coluna.lower(): coluna for coluna in COLUNAS_CONHECIDAS}
+
 
 # -----------------------------------------------------------------------------
 # Conversão
@@ -238,6 +246,19 @@ def _tabela_json(arquivo) -> pd.DataFrame:
     return pd.json_normalize(dados)
 
 
+# Padroniza os nomes das colunas: sem espaços nas pontas e com a grafia do USGS
+def _padronizar_cabecalho(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Tira os espaços das pontas e compara sem diferenciar maiúsculas:
+    " Latitude" vira "latitude" e "MAGTYPE" vira "magType". Colunas desconhecidas
+    ficam só sem os espaços. Se duas colunas viram o mesmo nome (ex.: "mag" e
+    "MAG"), fica a primeira.
+    """
+    nomes = [str(c).strip() for c in df.columns]
+    df.columns = [_GRAFIA_USGS.get(n.lower(), n) for n in nomes]
+    return df.loc[:, ~df.columns.duplicated()]
+
+
 # Lê e valida um arquivo .csv, .json ou .xml, descartando as linhas inválidas
 def ler_arquivo(arquivo, magnitude_minima: float | None = None,
                 nome: str | None = None) -> tuple[list[dict], int]:
@@ -261,6 +282,7 @@ def ler_arquivo(arquivo, magnitude_minima: float | None = None,
     except (ValueError, ParseError) as erro:  # ParserError, EmptyDataError e JSONDecodeError são ValueError
         raise ValueError(f"Não foi possível ler o {formato}: {erro}") from erro
 
+    df = _padronizar_cabecalho(df)
     faltando = COLUNAS_OBRIGATORIAS - set(df.columns)
     if faltando:
         raise ValueError(f"Colunas ausentes no {formato}: {sorted(faltando)}")

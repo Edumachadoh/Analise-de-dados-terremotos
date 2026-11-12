@@ -433,6 +433,18 @@ class UploadCsvTests(TestCase):
                                magnitude_minima=0)
         self.assertEqual(resposta.json()["novos"], 1)
 
+    # Testa se o cabeçalho é aceito em maiúsculas, misturado e com espaços nas pontas
+    def test_cabecalho_sem_diferenciar_maiusculas(self):
+        cabecalho = ("ID, MAG ,MagType,Time,UPDATED,Place,tsunami,alert,sig,felt,cdi,mmi,"
+                     "nst,gap,dmin,rms,status,net,TYPE,Longitude, Latitude,DEPTH")
+        resposta = self.enviar(csv_usgs(LINHA_CSV.format(id="a", mag=4.6, tipo="earthquake"),
+                                        cabecalho=cabecalho))
+        self.assertEqual(resposta.status_code, 201, resposta.json())
+        self.assertEqual(resposta.json()["novos"], 1)
+        terremoto = Terremoto.objects.get(usgs_id="a")
+        self.assertEqual((terremoto.latitude, terremoto.magnitude, terremoto.tipo_magnitude),
+                         (38.2, 4.6, "mb"))  # "MagType" volta a ser "magType"
+
     # Testa se um CSV sem as colunas obrigatórias devolve erro 400
     def test_colunas_ausentes_400(self):
         resposta = self.enviar(csv_usgs("a,4.5", cabecalho="id,mag"))

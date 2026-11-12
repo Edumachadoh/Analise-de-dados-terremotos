@@ -29,14 +29,10 @@ import pandas as pd
 from django.conf import settings
 from django.db import transaction
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-# from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (average_precision_score, f1_score, precision_score,
                              recall_score, roc_auc_score)
-# from sklearn.neighbors import KNeighborsClassifier
-# from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-# from sklearn.tree import DecisionTreeClassifier
 
 from ..models import ModeloTreinado, Terremoto
 
@@ -71,45 +67,6 @@ class ErroModelo(ValueError):
 # (na base real, previa 69% onde ocorreu 29%), e a tela mostra esse número como
 # probabilidade.
 ALGORITMOS = {
-    # Desativados por enquanto: para voltar, descomente também os imports no topo do arquivo.
-    # "regressao_logistica": {
-    #     "nome": "Regressão logística",
-    #     "descricao": "Modelo linear e interpretável. Serve de referência simples.",
-    #     "classe": LogisticRegression,
-    #     "padronizar": True,
-    #     "fixos": {"class_weight": "balanced", "max_iter": 2000},
-    #     "parametros": {
-    #         "C": {"tipo": "float", "padrao": 1.0, "min": 0.001, "max": 1000,
-    #               "descricao": "Inverso da regularização: menor = modelo mais simples"},
-    #     },
-    # },
-    # "arvore_decisao": {
-    #     "nome": "Árvore de decisão",
-    #     "descricao": "Aprende regras do tipo 'se... então'. Fácil de interpretar.",
-    #     "classe": DecisionTreeClassifier,
-    #     "padronizar": False,
-    #     "fixos": {"class_weight": "balanced", "random_state": 42},
-    #     "parametros": {
-    #         "max_depth": {"tipo": "int", "padrao": 5, "min": 1, "max": 30,
-    #                       "descricao": "Profundidade máxima da árvore"},
-    #         "min_samples_leaf": {"tipo": "int", "padrao": 5, "min": 1, "max": 500,
-    #                              "descricao": "Mínimo de amostras em cada folha"},
-    #     },
-    # },
-    # "knn": {
-    #     "nome": "K vizinhos mais próximos (KNN)",
-    #     "descricao": "Classifica pela maioria dos casos mais parecidos.",
-    #     "classe": KNeighborsClassifier,
-    #     "padronizar": True,  # KNN usa distância: sem padronizar, a maior escala domina
-    #     "fixos": {},
-    #     "parametros": {
-    #         "n_neighbors": {"tipo": "int", "padrao": 15, "min": 1, "max": 200,
-    #                         "descricao": "Número de vizinhos considerados"},
-    #         "weights": {"tipo": "escolha", "padrao": "uniform",
-    #                     "opcoes": ["uniform", "distance"],
-    #                     "descricao": "uniform: votos iguais; distance: vizinhos próximos pesam mais"},
-    #     },
-    # },
     "random_forest": {
         "nome": "Random Forest",
         "descricao": "Conjunto de árvores (ensemble). Robusto e mostra a importância das features.",
@@ -151,21 +108,6 @@ ALGORITMOS = {
                                        "algoritmo, árvores rasas, de 2 a 5 níveis, costumam bastar."},
         },
     },
-    # "rede_neural": {
-    #     "nome": "Rede neural (MLP)",
-    #     "descricao": "Perceptron multicamadas. Captura relações não lineares.",
-    #     "classe": MLPClassifier,
-    #     "padronizar": True,  # redes neurais convergem mal com escalas diferentes
-    #     "fixos": {"random_state": 42, "early_stopping": True},
-    #     "parametros": {
-    #         "camadas": {"tipo": "texto", "padrao": "32,16",
-    #                     "descricao": "Neurônios por camada oculta, separados por vírgula"},
-    #         "alpha": {"tipo": "float", "padrao": 0.0001, "min": 0.000001, "max": 1,
-    #                   "descricao": "Regularização L2"},
-    #         "max_iter": {"tipo": "int", "padrao": 500, "min": 50, "max": 3000,
-    #                      "descricao": "Máximo de épocas de treino"},
-    #     },
-    # },
 }
 
 
